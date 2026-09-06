@@ -25,6 +25,8 @@ The current version contains the opening sequence, menus, Chapter 1 gameplay, di
 - Support for Memory Stick and PSP Go internal storage
 - ARK-4 and ARK-5 compatibility improvements
 
+<img width="953" height="538" alt="image" src="https://github.com/user-attachments/assets/6d89880f-bae2-4260-b901-2531255feda0" />
+
 ## Requirements
 
 You will need:
