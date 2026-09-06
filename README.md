@@ -1,4 +1,5 @@
 # Helltaker PSP
+<img width="955" height="541" alt="image" src="https://github.com/user-attachments/assets/ce88ef63-8a68-4682-bcdb-d9907f85cd3f" />
 
 A fan-made PSP port of **Helltaker** by SurelyNotVain, optimized for the PlayStation Portable and packaged for compatibility with **ARK-4** and **ARK-5**.
 
