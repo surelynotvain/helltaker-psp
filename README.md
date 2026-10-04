@@ -1,59 +1,72 @@
 # Helltaker PSP
-<img width="955" height="541" alt="image" src="https://github.com/user-attachments/assets/ce88ef63-8a68-4682-bcdb-d9907f85cd3f" />
 
-A fan-made PSP port of **Helltaker** by SurelyNotVain, optimized for the PlayStation Portable and packaged for compatibility with **ARK-4** and **ARK-5**.
+![Main menu](screenshots/main_menu.png)
 
-The current version contains the opening sequence, menus, Chapter 1 gameplay, dialogue, music, sound effects, failure sequences, and victory animations.
+A fan-made PSP port of **Helltaker** by SurelyNotVain, packaged as standard unsigned homebrew for **ARK-4** and **ARK-5**.
+
+The whole game is playable: all chapters, the Judgement boss fight, the epilogue and both endings, plus the free **Examtaker** bonus chapter with its lab floors and the final boss.
 
 > [!IMPORTANT]
 > This is an unofficial fan project. It is not affiliated with or endorsed by vanripper, Sony, the ARK developers, or the original Helltaker team.
 
-## Features
+## What's included
 
-- Native 480×272 PSP presentation
-- Opening animation and cutscenes
-- Playable Chapter 1
-- D-pad and analog-stick controls
-- Music and sound effects
-- Chapter-selection screen
-- Failure, dialogue, and victory sequences
-- VBlank-synchronized double buffering
-- Optimized background and animation rendering
-- Streamed music with reduced memory usage
-- PSP-1000-compatible memory configuration
-- Proper HOME-button exit handling
-- Support for Memory Stick and PSP Go internal storage
-- ARK-4 and ARK-5 compatibility improvements
+### Main game
 
-<img width="953" height="538" alt="image" src="https://github.com/user-attachments/assets/6d89880f-bae2-4260-b901-2531255feda0" />
+- Chapters I to IX with every demon, dialogue and both outcomes of each conversation
+- Chapter X: the full Judgement boss fight with all four phases, the sin machine, the chains, the HP bar and the glorious success ending
+- The epilogue at home, the pancake talks, the secret inscriptions, the ritual dance and the abyss ending
+- Chapter select with every chapter you have reached
+- The pause menu with the three ritual code panels that fill in as you find the inscriptions
+- Credits
+
+![Chapter VII](screenshots/chapter_7.png)
+![Judgement](screenshots/judgement_boss.png)
+
+### Examtaker
+
+- The intro and the floor picker (start from the beginning or jump to any floor you have reached)
+- Lab floors I to VI as Subject 67: lasers that crates and walls block, timed lasers, generators to break and the step counter on the lab monitor
+- Floor VII: the Arch Mecha Demon boss with ground spike waves, laser volleys, cannon bombardments and the eraser beam, across all three phases
+- The Examtaker door transition, the ending with Lucifer and the Examtaker credits
+
+![Examtaker lab](screenshots/examtaker_lab.png)
+![Examtaker boss](screenshots/examtaker_boss.png)
+![Loremaster](screenshots/examtaker_dialogue.png)
+
+### Port features
+
+- Native 480x272 presentation using the PSP's hardware renderer (GU)
+- Original animations, dialogue portraits, fonts, music and sound effects
+- Streamed music
+- Progress is saved automatically (reached chapters, ritual pieces and Examtaker floors)
+- One step per button press, with a short anti-mash delay so held or bounced buttons never take extra steps
+- Works from Memory Stick and from PSP Go internal storage
 
 ## Requirements
 
-You will need:
-
-- A PlayStation Portable capable of running unsigned homebrew
-- ARK-4, ARK-5, or another compatible custom firmware
-- Approximately 65 MB of free storage
+- A PlayStation Portable that can run unsigned homebrew
+- ARK-4, ARK-5 or another compatible custom firmware
+- About 100 MB of free storage
 
 Official firmware without a homebrew environment cannot launch this application.
 
 ## Download
 
-Download the latest version from the **Releases** section of this GitHub repository.
-
-Extract the downloaded archive before copying it to your PSP.
+Download the latest version from the **Releases** section of this repository. The easiest option is `HelltakerPSP.zip`, which already contains the folder to copy.
 
 ## Installation
 
-The downloaded game directory must contain both files:
+The game folder must contain all three files:
 
 ```text
 HelltakerPSP/
-├── EBOOT.PBP
-└── MUSIC.PAK
+  EBOOT.PBP
+  HT.PAK
+  MUSIC.PAK
 ```
 
-Copy the complete `HelltakerPSP` directory to:
+Copy the complete `HelltakerPSP` folder to:
 
 ```text
 ms0:/PSP/GAME/HelltakerPSP/
@@ -65,238 +78,106 @@ For PSP Go internal storage, use:
 ef0:/PSP/GAME/HelltakerPSP/
 ```
 
-The final installation should look like this:
-
-```text
-ms0:/PSP/GAME/HelltakerPSP/EBOOT.PBP
-ms0:/PSP/GAME/HelltakerPSP/MUSIC.PAK
-```
-
-After copying the files, open the PSP Game menu and launch **Helltaker PSP**.
+Then open the Game menu on the PSP and launch **Helltaker PSP**.
 
 > [!WARNING]
-> Do not install `EBOOT.PBP` by itself. Music is streamed from `MUSIC.PAK`, which must remain in the same directory as the EBOOT.
+> Do not copy `EBOOT.PBP` on its own. `HT.PAK` holds the graphics and sound effects and `MUSIC.PAK` holds the music. Both must stay in the same folder as the EBOOT.
 
 ## Updating
 
-When installing a new version:
+1. Exit the game.
+2. Replace `EBOOT.PBP`, `HT.PAK` and `MUSIC.PAK` in `PSP/GAME/HelltakerPSP/` with the files from the new release.
+3. Keep `SETTINGS.BIN` if it is there. It is your save file (progress and settings).
 
-1. Exit the game completely.
-2. Delete the previous `HelltakerPSP` directory from your PSP.
-3. Extract the new release.
-4. Copy the complete new `HelltakerPSP` directory to `PSP/GAME/`.
-5. Confirm that both `EBOOT.PBP` and `MUSIC.PAK` were copied.
-
-Replacing only the EBOOT may cause missing music or incompatibility if the music package format changes.
+Older releases only had `EBOOT.PBP` and `MUSIC.PAK`. This version also needs `HT.PAK`, so copy all three.
 
 ## Controls
 
 | Button | Action |
 |---|---|
-| D-pad | Navigate menus and move |
-| Analog stick | Move when fully pushed in a direction |
-| Cross / X | Confirm, advance dialogue, or skip an animation |
-| Circle / O | Go back or close a notification |
-| Select | Open chapter selection from the main menu |
-| R trigger | Restart the current level |
-| HOME | Open the PSP exit menu |
+| D-pad or analog stick | Move one tile per press, navigate menus |
+| Cross (X) | Confirm, advance dialogue |
+| Circle (O) | Back |
+| START | Pause menu |
+| R or Square | Restart the level |
+| L or Triangle | Life advice (hint) |
+| HOME | PSP exit menu |
 
-Movement is turn-based. When using the analog stick, return it to the neutral position before making the next move.
+Movement is turn based. Each press moves one tile, so release the direction before the next step.
 
-## ARK compatibility
+## Compatibility
 
-The application is packaged as a standard unsigned user-mode PSP application and does not require kernel-mode access.
-
-Compatibility-related improvements include:
-
-- Standard PSP homebrew PBP structure
-- PSP-1000-compatible memory configuration
-- No expanded-memory requirement
-- Support for ARK-4 and ARK-5
-- Support for `ms0:` and `ef0:` installation paths
-- Music loading relative to the game directory
-- Synchronized music streaming
-- Proper HOME-button handling
-- Safe audio and thread cleanup
-
-The build is designed for:
-
-| Environment | Compatibility |
+| Environment | Status |
 |---|---|
 | ARK-4 | Supported |
 | ARK-5 | Supported |
-| PSP-1000 | Supported |
-| PSP-2000 | Supported |
-| PSP-3000 | Supported |
-| PSP Street | Supported |
+| PSP-1000 | Supported (standard 24 MB memory layout, no expanded memory needed) |
+| PSP-2000 / 3000 / Street | Supported |
 | PSP Go Memory Stick | Supported |
 | PSP Go internal storage | Supported through `ef0:` |
 
-Hardware behavior may vary depending on the PSP model, storage device, ARK version, and installed plugins.
-
-## Performance improvements
-
-This release includes several optimizations intended for physical PSP hardware:
-
-- Correct VBlank framebuffer swapping
-- Double-buffered rendering to reduce tearing and flickering
-- Cached static backgrounds and animation frames
-- Faster background drawing
-- Fewer expensive per-pixel calculations
-- Removed redundant full-screen clears
-- Reduced framebuffer redraw work
-- Lower audio resource usage
-- Small streamed-music buffer
-- Correct music playback speed
-- Safer sound mixing
-- Fixed audio streaming races
-- Fixed animation timing problems
-- Fixed out-of-bounds animation access
-- Improved shutdown and resource cleanup
+The game is tested in the PPSSPP emulator during development. Reports from real hardware are very welcome, especially from PSP-1000 owners on the Examtaker boss floor, which is the most demanding scene.
 
 ## Troubleshooting
 
-### The game does not appear in the PSP Game menu
+### The game does not appear in the Game menu
 
-Confirm that the directory structure is exactly:
+The folder structure must be exactly:
 
 ```text
 PSP/GAME/HelltakerPSP/EBOOT.PBP
 ```
 
-Avoid adding an extra nested directory such as:
+Avoid an extra nested folder such as `PSP/GAME/HelltakerPSP/HelltakerPSP/EBOOT.PBP`.
 
-```text
-PSP/GAME/HelltakerPSP/HelltakerPSP/EBOOT.PBP
-```
+### Black screen, missing graphics or no sound effects
 
-### The game starts without music
+Make sure `HT.PAK` is in the same folder as `EBOOT.PBP` and that it was copied completely (about 28 MB). Recopy it if in doubt.
 
-Make sure this file exists:
+### No music
 
-```text
-PSP/GAME/HelltakerPSP/MUSIC.PAK
-```
+Make sure `MUSIC.PAK` is in the same folder as `EBOOT.PBP` and that it was copied completely (about 71 MB). Keep the file names in upper case.
 
-The filename must remain uppercase and must be in the same directory as `EBOOT.PBP`.
+### Music stutters
 
-Do not rename or move `MUSIC.PAK`.
+Slow or damaged storage can interrupt streamed audio. Try copying the game again, using another Memory Stick or disabling plugins.
 
-### The game displays a black screen or returns to the XMB
+### The game returns to the XMB
 
-Try the following:
-
-1. Confirm that both release files were copied completely.
+1. Check that all three files were copied completely.
 2. Update ARK to a recent version.
 3. Launch the game directly from the XMB.
-4. Restart the PSP and try again.
-5. Temporarily disable game-related plugins to check for conflicts.
-6. Recopy the release files in case they were corrupted.
-7. Try another Memory Stick if available.
-
-### Music pauses or skips
-
-Slow or damaged storage can interrupt streamed audio.
-
-Try:
-
-- Copying the game again
-- Using another Memory Stick
-- Closing unnecessary plugins
-- Testing the game from PSP Go internal storage
-- Confirming that `MUSIC.PAK` was copied completely
-
-### PSP Go installation problems
-
-Try both supported storage locations:
-
-```text
-ms0:/PSP/GAME/HelltakerPSP/
-```
-
-```text
-ef0:/PSP/GAME/HelltakerPSP/
-```
-
-Make sure the selected storage device is visible to your installed ARK version.
-
-### Controls do not respond correctly
-
-Restart the game and ensure that no controller-related plugins are active.
-
-For analog movement, fully push the analog stick in one direction and return it to the center before attempting the next move.
-
-### The game freezes when exiting
-
-Use the PSP HOME menu and select the normal exit option.
-
-If the problem continues, include your PSP model, ARK version, and active plugins when submitting a bug report.
+4. Temporarily disable game related plugins.
+5. Try another Memory Stick if you have one.
 
 ## Reporting bugs
 
-Bug reports and hardware compatibility reports are welcome.
-
-When opening an issue, please include:
+Bug reports and hardware reports are welcome through GitHub Issues. Please include:
 
 - PSP model
-- System software version
 - ARK version
 - Installation path (`ms0:` or `ef0:`)
-- Whether the game was launched from the XMB or another launcher
-- Installed plugins that may affect games, controls, or audio
-- Steps needed to reproduce the problem
-- Whether music was playing when the problem occurred
-- A photograph or video if the problem is visual
+- Active plugins
+- The chapter or floor and what you were doing
+- Steps to reproduce the problem
+- A photo or video if the problem is visual
 
-Example report:
+## Notes
 
-```text
-PSP model: PSP-3000
-System software: 6.61
-ARK version: ARK-5
-Installation: ms0:/PSP/GAME/HelltakerPSP/
-Launch method: XMB
+The source code and development tools are not part of the public release.
 
-Problem:
-The game returns to the XMB after selecting New Game.
-
-Steps:
-1. Launch the game.
-2. Skip the opening animation.
-3. Select New Game.
-4. Press X.
-```
-
-## Known limitations
-
-- The current version focuses on Chapter 1.
-- Later chapters shown in chapter selection are not yet playable.
-- `MUSIC.PAK` is required and cannot be removed.
-- Compatibility may be affected by third-party PSP plugins.
-- Performance may vary with slower Memory Sticks.
-- Additional testing on different PSP models and ARK versions is welcome.
-
-## Feedback
-
-Feedback, testing results, and bug reports are welcome through GitHub Issues.
-
-The source code and development tools are not included in the public release.
-
-Please do not redistribute modified releases using the same name without clearly identifying that they are unofficial modifications.
+Please do not redistribute modified releases under the same name without clearly marking them as unofficial modifications.
 
 ## Credits
 
-- **Helltaker** was created by **vanripper**.
+- **Helltaker** and **Examtaker** were created by **vanripper** (Łukasz Piskorz).
+- Sound design by Patryk Karwat. Music by Mittsies.
 - PSP homebrew development is supported by the PSPSDK and pspdev communities.
-- ARK compatibility is provided by the ARK community and its contributors.
-- This PSP adaptation is an unofficial fan project.
+- ARK compatibility is thanks to the ARK community and its contributors.
+- PSP port by SurelyNotVain.
 
-All original Helltaker names, characters, artwork, music, and related assets belong to their respective creators and rights holders.
+All original Helltaker names, characters, artwork, music and related assets belong to their respective creators and rights holders. Helltaker is free on Steam; please support the original creator.
 
 ## Disclaimer
 
-This project is provided for educational, preservation, and entertainment purposes.
-
-It is not an official release and is provided without any warranty. The developers of this port are not responsible for data loss, storage corruption, console damage, or problems caused by unsupported firmware modifications or third-party plugins.
-
-Users are responsible for complying with any licenses and distribution terms that apply to the original game and its assets.
+This project is provided for educational, preservation and entertainment purposes. It is not an official release and comes without any warranty. The developers of this port are not responsible for data loss, storage corruption, console damage or problems caused by firmware modifications or third party plugins.
