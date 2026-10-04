@@ -112,11 +112,11 @@ Movement is turn based. Each press moves one tile, so release the direction befo
 | ARK-4 | Supported |
 | ARK-5 | Supported |
 | PSP-1000 | Supported (standard 24 MB memory layout, no expanded memory needed) |
-| PSP-2000 / 3000 / Street | Supported |
+| PSP-2000 / 3000 / Street | Supported (fully playtested on a PSP-3004) |
 | PSP Go Memory Stick | Supported |
 | PSP Go internal storage | Supported through `ef0:` |
 
-The game is tested in the PPSSPP emulator during development. Reports from real hardware are very welcome, especially from PSP-1000 owners on the Examtaker boss floor, which is the most demanding scene.
+The whole game, including Examtaker, has been fully playtested on a real PSP-3004. Minor bugs found during that playtest are being fixed in ongoing updates. Reports from other models are very welcome, especially from PSP-1000 owners on the Examtaker boss floor, which is the most demanding scene.
 
 ## Troubleshooting
 
