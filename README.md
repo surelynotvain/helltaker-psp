@@ -164,7 +164,7 @@ Bug reports and hardware reports are welcome through GitHub Issues. Please inclu
 
 ## Notes
 
-The source code and development tools are not part of the public release.
+The source code of the PSP engine is available in the [`engine`](engine/) folder. Game assets, converted game data and the data conversion tools are not included.
 
 Please do not redistribute modified releases under the same name without clearly marking them as unofficial modifications.
 
