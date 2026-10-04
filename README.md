@@ -2,7 +2,7 @@
 
 ![Main menu](screenshots/main_menu.png)
 
-A fan-made PSP port of **Helltaker** by SurelyNotVain, packaged as standard unsigned homebrew for **ARK-4** and **ARK-5**.
+**Helltaker PSP** is a complete fan-made port of **Helltaker** and its free **Examtaker** bonus chapter for the Sony PlayStation Portable, by SurelyNotVain. It is PSP homebrew with its own engine written in C, packaged as a standard unsigned application for **ARK-4** and **ARK-5**, and fully playtested on a real PSP-3004.
 
 The whole game is playable: all chapters, the Judgement boss fight, the epilogue and both endings, plus the free **Examtaker** bonus chapter with its lab floors and the final boss.
 
