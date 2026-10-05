@@ -6,6 +6,10 @@
 
 The whole game is playable: all chapters, the Judgement boss fight, the epilogue and both endings, plus the free **Examtaker** bonus chapter with its lab floors and the final boss.
 
+![Helltaker PSP in the XMB of a real PSP-3004](screenshots/real_psp_3004.jpg)
+
+*Running on a real PSP-3004: Helltaker PSP in the XMB Game menu.*
+
 > [!IMPORTANT]
 > This is an unofficial fan project. It is not affiliated with or endorsed by vanripper, Sony, the ARK developers, or the original Helltaker team.
 
