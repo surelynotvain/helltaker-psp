@@ -1,3 +1,6 @@
+[![Total Download badge](https://img.shields.io/github/downloads/surelynotvain/helltaker-psp/total)](https://github.com/surelynotvain/helltaker-psp/releases/latest)
+[![Version badge](https://img.shields.io/github/v/release/surelynotvain/helltaker-psp)](https://github.com/surelynotvain/helltaker-psp/releases/latest)
+
 # Helltaker PSP
 
 ![Main menu](screenshots/main_menu.png)
