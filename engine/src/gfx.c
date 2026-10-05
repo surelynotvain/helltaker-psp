@@ -5,6 +5,7 @@
 #include <pspiofilemgr.h>
 #include <malloc.h>
 #include <string.h>
+#include <stdio.h>
 #include <math.h>
 #include "gfx.h"
 #include "gamedata.h"
@@ -16,6 +17,9 @@ static unsigned int __attribute__((aligned(64))) dlist[256 * 1024 / 4];
 static void *draw_fb, *disp_fb;
 
 static int pak_fd = -1;
+static char pak_path[256];
+static int pak_gen;
+volatile int g_resume_gen;
 static uint8_t *bundle_mem[NUM_BUNDLES];
 static uint8_t *font_mem;
 static int bound_page = -2;
@@ -80,8 +84,18 @@ void gfx_end(void)
     sceGuSwapBuffers();
 }
 
+static void pak_reopen(void)
+{
+    if (pak_fd >= 0)
+        sceIoClose(pak_fd);
+    pak_gen = g_resume_gen;
+    pak_fd = sceIoOpen(pak_path, PSP_O_RDONLY, 0);
+}
+
 int gfx_pak_open(const char *path)
 {
+    snprintf(pak_path, sizeof pak_path, "%s", path);
+    pak_gen = g_resume_gen;
     pak_fd = sceIoOpen(path, PSP_O_RDONLY, 0);
     if (pak_fd < 0)
         return pak_fd;
@@ -94,13 +108,25 @@ void *pak_read_alloc(uint32_t off, uint32_t size)
     uint8_t *mem = memalign(64, size);
     if (!mem)
         return 0;
-    sceIoLseek32(pak_fd, off, PSP_SEEK_SET);
     uint32_t got = 0;
-    while (got < size) {
-        int r = sceIoRead(pak_fd, mem + got, size - got);
-        if (r <= 0)
-            break;
-        got += r;
+    /* a failed read (stale handle after sleep, stick still waking up) reopens the PAK and retries */
+    for (int attempt = 0; attempt < 50 && got != size; attempt++) {
+        if (attempt) {
+            sceKernelDelayThread(100000);
+            pak_reopen();
+        } else if (pak_gen != g_resume_gen || pak_fd < 0) {
+            pak_reopen();
+        }
+        if (pak_fd < 0)
+            continue;
+        sceIoLseek32(pak_fd, off, PSP_SEEK_SET);
+        got = 0;
+        while (got < size) {
+            int r = sceIoRead(pak_fd, mem + got, size - got);
+            if (r <= 0)
+                break;
+            got += r;
+        }
     }
     if (got != size) {
         free(mem);

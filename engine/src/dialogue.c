@@ -137,8 +137,8 @@ static void mask_done(void)
             P.player_turn = 1;
         }
         talker_kind = 0;
-    } else {
-        decor_hide_love_signs();
+    } else if (D->epilogue != 1) {
+        decor_hide_love_signs(D->signs);   /* GoalSprite.demons[j].sign.SetActive(false): this dialogue's demons only */
     }
 }
 

@@ -17,6 +17,7 @@ typedef struct {
 
 typedef struct {
     int spr;                 /* SPR_NONE if the clip has no sprite track */
+    uint8_t spr_null;        /* a child sprite track keyed to null (SpriteRenderer.sprite = null) */
     float dx, dy;            /* local position curves (world units), valid if has_posx/has_posy */
     float sx, sy;            /* local scale curves, valid if has_scale */
     float a, r, g, b;        /* colour curves, valid if has_* */

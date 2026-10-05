@@ -31,11 +31,22 @@ static int exit_cb(int a, int b, void *c)
     return 0;
 }
 
+static int power_cb(int unknown, int flags, void *arg)
+{
+    (void)unknown; (void)arg;
+    if (flags & PSP_POWER_CB_RESUME_COMPLETE)
+        g_resume_gen++;   /* file readers reopen their PAKs */
+    return 0;
+}
+
 static int cb_thread(SceSize args, void *argp)
 {
     (void)args; (void)argp;
     int cb = sceKernelCreateCallback("exit", exit_cb, 0);
     sceKernelRegisterExitCallback(cb);
+    int pcb = sceKernelCreateCallback("power", power_cb, 0);
+    if (scePowerRegisterCallback(-1, pcb) < 0)
+        scePowerRegisterCallback(0, pcb);
     sceKernelSleepThreadCB();
     return 0;
 }
@@ -160,6 +171,16 @@ static int script_step(unsigned *held)
             extern int g_dlg_force_start;
             g_dlg_force_start = num;
             dlg_start(atoi(arg));
+            return 1;
+        }
+        if (!strcmp(cmd, "amd")) {   /* amd N: Manager.AMDphase (set before "scene 27") */
+            extern int g_amd_phase;
+            g_amd_phase = atoi(arg);
+            return 1;
+        }
+        if (!strcmp(cmd, "amdhit")) {   /* kick the AMD core (phase 3: the kill) */
+            extern void amd_core_hit(void);
+            amd_core_hit();
             return 1;
         }
         if (!strcmp(cmd, "god")) {

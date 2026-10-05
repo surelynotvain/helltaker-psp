@@ -258,6 +258,7 @@ static void eval_curves(const Animator *a, uint32_t path, AnimOut *o, int use_fr
             for (int j = 0; j < cv->n && k[j].t <= ms; j++)
                 spr = k[j].v;
             o->spr = spr < 0 ? SPR_NONE : spr;
+            o->spr_null = spr < 0;
             continue;
         }
         float v;

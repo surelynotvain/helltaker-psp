@@ -199,11 +199,11 @@ void decor_demons_get(void)
     }
 }
 
-void decor_hide_love_signs(void)
+void decor_hide_love_signs(uint32_t demons)
 {
     for (int i = 0; i < S->ndecor && i < MAX_DECOR; i++) {
         const DecorDef *d = &S->decor[i];
-        if (d->spr == SPR_lovesign || (d->ctrl >= 0 && !strcmp(g_ctrls[d->ctrl].name, "loveSign")))
+        if (d->sign >= 0 && (demons >> d->sign) & 1)
             decor[i].hidden = 1;
     }
 }
@@ -291,7 +291,7 @@ static void decor_draw(int layer)
         if (an) {
             AnimOut o;
             anim_eval_path(an, path, &o);
-            if (!o.active || (d->kind == 11 && !o.has_active))
+            if (!o.active || o.spr_null || (d->kind == 11 && !o.has_active))
                 continue;
             if (o.spr != SPR_NONE)
                 spr = o.spr;

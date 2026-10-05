@@ -168,7 +168,7 @@ void lab_pillar_alive_set(int i, int alive);
 int lab_pillar_alive(int i);
 void lab_player_hit(void);
 void decor_demons_get(void);
-void decor_hide_love_signs(void);
+void decor_hide_love_signs(uint32_t demons);   /* bit = DecorDef.sign */
 
 /* clip ids resolved at startup */
 extern int CLIP_DUST[3], CLIP_HIT[2], CLIP_HIT_SMALL[2], CLIP_BLOOD[3], CLIP_KEYVFX, CLIP_DEATH, CLIP_LOVEPLOSION,

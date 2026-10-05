@@ -4,6 +4,7 @@
 #include <pspaudio.h>
 #include <pspiofilemgr.h>
 #include <string.h>
+#include <stdio.h>
 #include <malloc.h>
 #include "audio.h"
 #include "gfx.h"
@@ -140,6 +141,7 @@ void sfx_mute_new(int on) { dead_sound = on; }
 
 /* ---------------------------------------------------------------- music */
 static int mus_fd = -1;
+static char mus_path[256];
 static uint8_t ring[RING_BLOCKS][MUS_BLOCK_BYTES];
 static volatile int ring_rd, ring_wr;           /* block counters */
 static volatile int want_track = -1, cur_track = -1;
@@ -153,7 +155,7 @@ static volatile int running;
 
 static int io_thread(SceSize args, void *argp)
 {
-    int my_gen = -1, track = -1;
+    int my_gen = -1, track = -1, fd_gen = g_resume_gen;
     uint32_t off = 0, size = 0, pos = 0;
     (void)args; (void)argp;
     while (running) {
@@ -171,7 +173,7 @@ static int io_thread(SceSize args, void *argp)
             gen_ack = my_gen;
         }
         int filled = 0;
-        while (size && ring_wr - ring_rd < RING_BLOCKS && my_gen == gen) {
+        while (running && size && ring_wr - ring_rd < RING_BLOCKS && my_gen == gen) {
             int n = 8;
             int space = RING_BLOCKS - (ring_wr - ring_rd);
             int contig = RING_BLOCKS - (ring_wr % RING_BLOCKS);
@@ -179,10 +181,28 @@ static int io_thread(SceSize args, void *argp)
             if (n > contig) n = contig;
             uint32_t left = (size - pos) / MUS_BLOCK_BYTES;
             if ((uint32_t)n > left) n = left;
-            sceIoLseek32(mus_fd, off + pos, PSP_SEEK_SET);
-            sceIoRead(mus_fd, ring[ring_wr % RING_BLOCKS], n * MUS_BLOCK_BYTES);
+            /* after a sleep the old handle is stale: reopen, and never queue a block that was not read
+             * (the ring would replay old audio) */
+            if (fd_gen != g_resume_gen || mus_fd < 0) {
+                if (mus_fd >= 0)
+                    sceIoClose(mus_fd);
+                fd_gen = g_resume_gen;
+                mus_fd = sceIoOpen(mus_path, PSP_O_RDONLY, 0);
+            }
+            int want = n * MUS_BLOCK_BYTES, r = -1;
+            if (mus_fd >= 0) {
+                sceIoLseek32(mus_fd, off + pos, PSP_SEEK_SET);
+                r = sceIoRead(mus_fd, ring[ring_wr % RING_BLOCKS], want);
+            }
             if (my_gen != gen)
                 break;
+            if (r != want) {
+                if (mus_fd >= 0)
+                    sceIoClose(mus_fd);
+                mus_fd = -1;
+                sceKernelDelayThread(100000);
+                continue;
+            }
             ring_wr += n;
             pos += n * MUS_BLOCK_BYTES;
             if (pos >= size)
@@ -334,6 +354,7 @@ static int mix_thread(SceSize args, void *argp)
 int audio_init(const char *music_pak)
 {
     sfx_mem = pak_read_alloc(g_sfx_off, g_sfx_size);
+    snprintf(mus_path, sizeof mus_path, "%s", music_pak);
     mus_fd = sceIoOpen(music_pak, PSP_O_RDONLY, 0);
     audio_ch = sceAudioChReserve(PSP_AUDIO_NEXT_CHANNEL, OUT_FRAMES, PSP_AUDIO_FORMAT_STEREO);
     if (audio_ch < 0)
