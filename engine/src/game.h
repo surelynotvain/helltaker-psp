@@ -105,6 +105,7 @@ float dlg_ui_slide(void);
 void ui_reset(void);
 void ui_update(void);
 void ui_draw(void);
+void ui_draw_pause(void);
 int ui_pause_open(void);
 void widget_open(void);
 void widget2_open(int dlc);

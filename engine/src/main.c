@@ -64,11 +64,14 @@ static void save_read(void)
     path_join(p, sizeof p, "SETTINGS.BIN");
     memset(&g_save, 0, sizeof g_save);
     int fd = sceIoOpen(p, PSP_O_RDONLY, 0);
+    int got = 0;
     if (fd >= 0) {
-        sceIoRead(fd, &g_save, sizeof g_save);
+        got = sceIoRead(fd, &g_save, sizeof g_save);
         sceIoClose(fd);
     }
-    if (g_save.magic != SAVE_MAGIC) {
+    /* saves from before Examtaker are 8 bytes (no dlc_progress); anything shorter is truncated */
+    if (got < 8 || g_save.magic != SAVE_MAGIC) {
+        memset(&g_save, 0, sizeof g_save);
         g_save.magic = SAVE_MAGIC;
         g_save.music_vol = 2;  /* PlayerPrefs defaults */
         g_save.sfx_vol = 3;

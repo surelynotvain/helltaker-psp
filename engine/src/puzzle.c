@@ -364,6 +364,7 @@ static void game_over(int target)
     printf("game_over target=%d frozen=%d will=%d\n", target, P.frozen, P.will);
 #endif
     P.un_menuable = 1;
+    sfx_loop_stop();   /* Manager.SinMuter(absolute: true): machine loop off */
     if (!P.frozen) {
         P.frozen = 1;
         sfx_play(SFX_player_death_01, 0);

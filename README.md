@@ -43,6 +43,7 @@ The whole game is playable: all chapters, the Judgement boss fight, the epilogue
 - Native 480x272 presentation using the PSP's hardware renderer (GU)
 - Original animations, dialogue portraits, fonts, music and sound effects
 - Streamed music
+- Animated XMB icon (a chapter I speedrun) and XMB background music
 - Progress is saved automatically (reached chapters, ritual pieces and Examtaker floors)
 - One step per button press, with a short anti-mash delay so held or bounced buttons never take extra steps
 - Works from Memory Stick and from PSP Go internal storage

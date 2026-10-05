@@ -375,6 +375,12 @@ void ui_reset(void)
     w2_on = 0;
     vol[0] = g_save.music_vol;
     vol[1] = g_save.sfx_vol;
+    static int menu_seen;   /* Manager.first */
+    if (S->kind == SK_MENU) {
+        if (menu_seen)
+            g_menu_returning = 1;
+        menu_seen = 1;
+    }
     door_reset(!(S->kind == SK_MENU && !g_menu_returning));
 }
 
@@ -449,6 +455,11 @@ void ui_draw(void)
         widget_draw();
     if (w2_on)
         widget2_draw();
+}
+
+/* the pause menu covers everything except the door transition (dialogue and boss UI included) */
+void ui_draw_pause(void)
+{
     if (pause_open)
         pause_draw();
 }

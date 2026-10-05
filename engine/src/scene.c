@@ -509,6 +509,7 @@ void game_draw(void)
     ui_draw();
     boss_draw_ui();
     dlg_draw_ui();
+    ui_draw_pause();
     door_draw();
     gfx_end();
 }
