@@ -284,6 +284,11 @@ void gfx_sprite_rot90(int spr, float x, float y, float sx, float sy, uint32_t co
     gfx_sprite_rot(spr, x, y, sx, sy, 90.0f, color);
 }
 
+void gfx_silhouette(int on)
+{
+    sceGuTexFunc(on ? GU_TFX_ADD : GU_TFX_MODULATE, GU_TCC_RGBA);
+}
+
 void gfx_sprite_additive(int spr, float x, float y, float sx, float sy, uint32_t color)
 {
     sprite_draw(spr, x, y, sx, sy, color, 1);

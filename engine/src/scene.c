@@ -343,7 +343,9 @@ static void decor_draw(int layer)
                 a = t < 0.5f ? t / 0.5f : 1.0f;
                 if (t > 1.0f)
                     continue;
+                gfx_silhouette(d->white);   /* Font Material: a pure white silhouette */
                 gfx_sprite_additive(spr, gfx_wx(x), gfx_wy(y), sx, sy, RGBA(255, 255, 255, (int)(a * 255)));
+                gfx_silhouette(0);
                 continue;
             }
             if (t > 1.0f)
@@ -354,12 +356,16 @@ static void decor_draw(int layer)
         uint32_t col = RGBA(d->r, d->g, d->b, (int)(a * 255));
         if (gflash > 0)
             col = WHITE;
+        if (d->white)
+            gfx_silhouette(1);
         if (d->kind == 1)
             gfx_sprite_additive(spr, gfx_wx(x), gfx_wy(y), sx, sy, col);
         else if (rot > 0.01f || rot < -0.01f)
             gfx_sprite_rot(spr, gfx_wx(x), gfx_wy(y), sx, sy, rot, col);
         else
             gfx_sprite(spr, gfx_wx(x), gfx_wy(y), sx, sy, col);
+        if (d->white)
+            gfx_silhouette(0);
     }
 }
 

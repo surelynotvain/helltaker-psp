@@ -469,9 +469,9 @@ void boss_draw_layer(int layer)
             }
             if (a <= 0.01f || w <= 0.01f)
                 continue;
-            /* warning chains read grey, the strike is solid white */
-            uint32_t col = t < 0.5f ? RGBA(150, 140, 160, (int)((0.25f + a) * 255))
-                                    : RGBA(255, 255, 255, (int)(a * 255));
+            /* sinChainlink renders with Font Material: a white silhouette, faint while warning */
+            uint32_t col = RGBA(255, 255, 255, (int)(a * 255));
+            gfx_silhouette(1);
             for (int k = -6; k <= 6; k++) {
                 float off = k * 1.5f;
                 if (chains[i].vertical)
@@ -479,6 +479,7 @@ void boss_draw_layer(int layer)
                 else
                     gfx_sprite_rot(SPR_chainlink, gfx_wx(chains[i].center + off), gfx_wy(chains[i].coord + 0.2f), w, 1, 90, col);
             }
+            gfx_silhouette(0);
         }
     }
 }

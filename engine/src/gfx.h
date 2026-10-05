@@ -30,6 +30,9 @@ void gfx_sprite(int spr, float x, float y, float sx, float sy, uint32_t color);
 void gfx_sprite_rot(int spr, float x, float y, float sx, float sy, float deg, uint32_t color);
 void gfx_sprite_rot90(int spr, float x, float y, float sx, float sy, uint32_t color);
 void gfx_sprite_additive(int spr, float x, float y, float sx, float sy, uint32_t color);
+/* silhouette mode: sprites draw as the vertex colour (white) through the texture's alpha
+ * (Unity's "Font Material"); GU_TFX_ADD saturates texture + white to white, alpha = tex * vertex */
+void gfx_silhouette(int on);
 /* Stretch a sprite's trimmed image into a screen rectangle. */
 void gfx_sprite_rect(int spr, float x, float y, float w, float h, uint32_t color);
 int gfx_sprite_w(int spr);
