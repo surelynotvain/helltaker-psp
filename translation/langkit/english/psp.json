@@ -1,0 +1,12 @@
+{
+ "_note": "PSP wording of lines that name PC keys, and lines the PSP port adds (local/m.json 35: LANGUAGE (pause menu), 36: PSP port by SurelyNotVain): file -> line number (0-based) -> text. Use [X], [L], [R] for the PSP buttons.",
+ "local/m.json": {
+  "2": "RESTART [R]",
+  "3": "[L] LIFE ADVICE",
+  "35": "LANGUAGE",
+  "36": "PSP port by SurelyNotVain"
+ },
+ "local/m1.json": {
+  "20": "Press [X] to continue."
+ }
+}

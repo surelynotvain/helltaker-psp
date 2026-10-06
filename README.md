@@ -75,6 +75,10 @@ With a language pack installed:
 
 Without `LANG.PAK` the game is exactly as before, in English. Only one language pack can be installed at a time.
 
+### Make your own translation
+
+The [`translation`](translation/) folder has everything needed to build a `LANG.PAK` for any language from the PC game's text files: the `mklang.py` tool (Python 3 with Pillow and numpy) and a step by step guide, [`TRANSLATING.md`](translation/TRANSLATING.md). It contains no game text: it reads the English files from your own Helltaker install (free on Steam), and an existing translation of the PC game can be used as it is. Finished a translation? Share it through GitHub Issues so it can be added to a release, with credit.
+
 ## Requirements
 
 - A PlayStation Portable that can run unsigned homebrew
@@ -197,7 +201,7 @@ Bug reports and hardware reports are welcome through GitHub Issues. Please inclu
 
 ## Notes
 
-The source code of the PSP engine is available in the [`engine`](engine/) folder. Game assets, converted game data and the data conversion tools are not included.
+The source code of the PSP engine is available in the [`engine`](engine/) folder, and the translation tools in the [`translation`](translation/) folder. Game assets, converted game data and the data conversion tools are not included.
 
 Please do not redistribute modified releases under the same name without clearly marking them as unofficial modifications.
 
@@ -208,6 +212,7 @@ Please do not redistribute modified releases under the same name without clearly
 - PSP homebrew development is supported by the PSPSDK and pspdev communities.
 - ARK compatibility is thanks to the ARK community and its contributors.
 - Polish translation: the official translation by vanripper.
+- Translation fonts: Crimson Pro (The Crimson Pro Project Authors), Amiri (Khaled Hosny) and Segment7 (Cedric Knight), all under the SIL Open Font License 1.1 (see `translation/langkit/fonts/OFL.txt`).
 - PSP port by SurelyNotVain.
 
 All original Helltaker names, characters, artwork, music and related assets belong to their respective creators and rights holders. Helltaker is free on Steam; please support the original creator.
