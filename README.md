@@ -24,7 +24,7 @@ The whole game is playable: all chapters, the Judgement boss fight, the epilogue
 - Chapter X: the full Judgement boss fight with all four phases, the sin machine, the chains, the HP bar and the glorious success ending
 - The epilogue at home, the pancake talks, the secret inscriptions, the ritual dance and the abyss ending
 - Chapter select with every chapter you have reached
-- The pause menu with the three ritual code panels that fill in as you find the inscriptions
+- The pause menu with the three ritual code panels that fill in as you find the inscriptions (also in the house: with all three found it shows the whole ritual path)
 - Credits
 
 ![Chapter VII](screenshots/chapter_7.png)
@@ -43,13 +43,37 @@ The whole game is playable: all chapters, the Judgement boss fight, the epilogue
 
 ### Port features
 
+- Built on **Vain's C Portable Engine**, the PSP engine shared with the Awaria PSP port
 - Native 480x272 presentation using the PSP's hardware renderer (GU)
+- Language packs (`LANG.PAK`): play in English or in an installed translation, switchable at any time
 - Original animations, dialogue portraits, fonts, music and sound effects
 - Streamed music
 - Animated XMB icon (a chapter I speedrun) and XMB background music
 - Progress is saved automatically (reached chapters, ritual pieces and Examtaker floors)
 - One step per button press, with a short anti-mash delay so held or bounced buttons never take extra steps
 - Works from Memory Stick and from PSP Go internal storage
+
+## Languages
+
+The game is in English. A language pack adds a translation of every dialogue, menu and prompt:
+
+| Language | File | Translation |
+|---|---|---|
+| Polski (Polish) | `LANG-Polski.PAK` | Official Polish translation by vanripper ([Helltaker spolszczenie](https://vanripper.itch.io/helltaker-spolszczenie)) |
+
+To install one:
+
+1. Download the `LANG-....PAK` file from the release.
+2. Copy it into `PSP/GAME/HelltakerPSP/` next to `EBOOT.PBP`.
+3. Rename it to `LANG.PAK`.
+
+With a language pack installed:
+
+- At start-up the game asks for the language: ENGLISH or the translation (D-pad or analog stick, then X). It starts on your last choice.
+- Press START in the main menu to choose the language again.
+- The pause menu has a LANGUAGE row that switches between English and the translation instantly.
+
+Without `LANG.PAK` the game is exactly as before, in English. Only one language pack can be installed at a time.
 
 ## Requirements
 
@@ -72,6 +96,7 @@ HelltakerPSP/
   EBOOT.PBP
   HT.PAK
   MUSIC.PAK
+  LANG.PAK      (optional, a language pack)
 ```
 
 Copy the complete `HelltakerPSP` folder to:
@@ -97,7 +122,7 @@ Then open the Game menu on the PSP and launch **Helltaker PSP**.
 2. Replace `EBOOT.PBP`, `HT.PAK` and `MUSIC.PAK` in `PSP/GAME/HelltakerPSP/` with the files from the new release.
 3. Keep `SETTINGS.BIN` if it is there. It is your save file (progress and settings).
 
-Older releases only had `EBOOT.PBP` and `MUSIC.PAK`. This version also needs `HT.PAK`, so copy all three.
+Version 2.0 changed `HT.PAK`, so from 1.51 or older replace both `EBOOT.PBP` and `HT.PAK` (`MUSIC.PAK` is unchanged since 1.3). Language packs belong to the game version they were released with: when you update the game, also download the language pack again from the same release.
 
 ## Controls
 
@@ -106,7 +131,7 @@ Older releases only had `EBOOT.PBP` and `MUSIC.PAK`. This version also needs `HT
 | D-pad or analog stick | Move one tile per press, navigate menus |
 | Cross (X) | Confirm, advance dialogue |
 | Circle (O) | Back |
-| START | Pause menu |
+| START | Pause menu (in the main menu: choose the language, when a language pack is installed) |
 | R or Square | Restart the level |
 | L or Triangle | Life advice (hint) |
 | HOME | PSP exit menu |
@@ -182,6 +207,7 @@ Please do not redistribute modified releases under the same name without clearly
 - Sound design by Patryk Karwat. Music by Mittsies.
 - PSP homebrew development is supported by the PSPSDK and pspdev communities.
 - ARK compatibility is thanks to the ARK community and its contributors.
+- Polish translation: the official translation by vanripper.
 - PSP port by SurelyNotVain.
 
 All original Helltaker names, characters, artwork, music and related assets belong to their respective creators and rights holders. Helltaker is free on Steam; please support the original creator.
