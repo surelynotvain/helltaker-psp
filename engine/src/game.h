@@ -18,6 +18,7 @@ typedef struct {
     uint8_t chapter_reached;
     uint8_t rituals;   /* Alfa/Beta/Gamma inscription pieces (chapters IV-VI) */
     uint8_t dlc_progress; /* PlayerPrefs dlcProgress: furthest Examtaker floor (pauseMenu.DLCChapter) */
+    uint8_t lang_off;     /* 1: English although a LANG.PAK is installed (pause menu > LANGUAGE) */
 } Save;
 extern Save g_save;
 void save_write(void);
@@ -39,6 +40,7 @@ void cam_shake(float dur, float amount);
 extern int g_scene;
 extern const SceneDef *S;
 void scene_request(int index);      /* load at end of frame */
+void lang_choose(void);             /* main.c: ENGLISH / translation picker (LANG.PAK only) */
 void scene_restart_with_door(int target); /* Player.Advance after door closes; -2 reload, -1 next */
 void door_close_then(int target);
 int scene_kind(void);

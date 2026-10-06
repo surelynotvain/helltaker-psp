@@ -422,6 +422,16 @@ void player_victory(void)
 }
 
 /* ------------------------------------------------------------ triggers */
+/* goalSpriteEnding: BoxCollider2D 2.0 x 0.5 (tiles left and right of the girl) plus a
+ * CapsuleCollider2D 0.5 x 2.0 (tiles above and below), so any tile next to her starts the talk */
+static int trig_hit(const TrigDef *t, int x, int y)
+{
+    int w = t->w ? t->w : 1;
+    if (y == t->y && x >= t->x && x < t->x + w)
+        return 1;
+    return t->v && x == t->x + w / 2 && y != t->y && abs(y - t->y) <= t->v;
+}
+
 static void check_triggers(void)
 {
     int x = P.player.x, y = P.player.y;
@@ -453,7 +463,7 @@ static void check_triggers(void)
         if (t->kind == TRIG_GOAL && t->x == x && t->y == y && t->dlg >= 0 && !P.frozen) {
             P.frozen = 1;
             dlg_start(t->dlg);
-        } else if (t->kind == TRIG_OTHER && x >= t->x && x < t->x + (t->w ? t->w : 1) && t->y == y && t->dlg >= 0 &&
+        } else if (t->kind == TRIG_OTHER && trig_hit(t, x, y) && t->dlg >= 0 &&
                    !P.frozen && (trig_on & (1u << i)) && !(trig_used & (1u << i))) {
             /* epilogue: each girl's pancake talk plays once */
             cur_trig = i;

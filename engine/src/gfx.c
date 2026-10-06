@@ -8,220 +8,42 @@
 #include <stdio.h>
 #include <math.h>
 #include "gfx.h"
+#include "vcpe.h"
 #include "gamedata.h"
 
-#define BUF_W 512
-#define FB_SIZE (BUF_W * SCR_H * 4)
 
-static unsigned int __attribute__((aligned(64))) dlist[256 * 1024 / 4];
-static void *draw_fb, *disp_fb;
 
-static int pak_fd = -1;
-static char pak_path[256];
-static int pak_gen;
-volatile int g_resume_gen;
-static uint8_t *bundle_mem[NUM_BUNDLES];
 static uint8_t *font_mem;
-static int bound_page = -2;
-static int bound_mode = -1;  /* 0 normal alpha, 1 additive */
 static float cam_x, cam_y, shake_x, shake_y;
 
-typedef struct {
-    float u, v;
-    uint32_t color;
-    float x, y, z;
-} Vtx;
 
 int gfx_init(void)
 {
-    draw_fb = (void *)0;
-    disp_fb = (void *)FB_SIZE;
-    sceGuInit();
-    sceGuStart(GU_DIRECT, dlist);
-    sceGuDrawBuffer(GU_PSM_8888, draw_fb, BUF_W);
-    sceGuDispBuffer(SCR_W, SCR_H, disp_fb, BUF_W);
-    sceGuOffset(2048 - (SCR_W / 2), 2048 - (SCR_H / 2));
-    sceGuViewport(2048, 2048, SCR_W, SCR_H);
-    sceGuScissor(0, 0, SCR_W, SCR_H);
-    sceGuEnable(GU_SCISSOR_TEST);
-    sceGuDisable(GU_DEPTH_TEST);
-    sceGuDisable(GU_CULL_FACE);
-    sceGuEnable(GU_TEXTURE_2D);
-    sceGuEnable(GU_BLEND);
-    sceGuBlendFunc(GU_ADD, GU_SRC_ALPHA, GU_ONE_MINUS_SRC_ALPHA, 0, 0);
-    sceGuTexFunc(GU_TFX_MODULATE, GU_TCC_RGBA);
-    sceGuTexFilter(GU_LINEAR, GU_LINEAR);
-    sceGuTexWrap(GU_CLAMP, GU_CLAMP);
-    sceGuShadeModel(GU_SMOOTH);
-    sceGuFinish();
-    sceGuSync(0, 0);
-    sceDisplayWaitVblankStart();
-    sceGuDisplay(GU_TRUE);
-    return 0;
+    vcpe_gfx_tables((const VcpePage *)g_pages, (const VcpeBundle *)g_bundles, NUM_BUNDLES);
+    return vcpe_gfx_init();
 }
 
-void gfx_shutdown(void)
-{
-    sceGuTerm();
-    if (pak_fd >= 0)
-        sceIoClose(pak_fd);
-}
+void gfx_shutdown(void) { vcpe_gfx_shutdown(); }
 
-void gfx_begin(uint32_t clear)
-{
-    sceGuStart(GU_DIRECT, dlist);
-    sceGuClearColor(clear);
-    sceGuClear(GU_COLOR_BUFFER_BIT);
-    bound_page = -2;
-    bound_mode = -1;
-}
+void gfx_begin(uint32_t clear) { vcpe_gfx_begin(clear); }
 
-void gfx_end(void)
-{
-    sceGuFinish();
-    sceGuSync(0, 0);
-    sceDisplayWaitVblankStart();
-    sceGuSwapBuffers();
-}
+void gfx_end(void) { vcpe_gfx_end(); }
 
-static void pak_reopen(void)
-{
-    if (pak_fd >= 0)
-        sceIoClose(pak_fd);
-    pak_gen = g_resume_gen;
-    pak_fd = sceIoOpen(pak_path, PSP_O_RDONLY, 0);
-}
 
 int gfx_pak_open(const char *path)
 {
-    snprintf(pak_path, sizeof pak_path, "%s", path);
-    pak_gen = g_resume_gen;
-    pak_fd = sceIoOpen(path, PSP_O_RDONLY, 0);
-    if (pak_fd < 0)
-        return pak_fd;
-    font_mem = pak_read_alloc(g_font_off, g_font_size);
+    int fd = vcpe_pak_open(path);
+    if (fd < 0)
+        return fd;
+    font_mem = vcpe_pak_read_alloc(g_font_off, g_font_size);
     return font_mem ? 0 : -1;
 }
 
-void *pak_read_alloc(uint32_t off, uint32_t size)
-{
-    uint8_t *mem = memalign(64, size);
-    if (!mem)
-        return 0;
-    uint32_t got = 0;
-    /* a failed read (stale handle after sleep, stick still waking up) reopens the PAK and retries */
-    for (int attempt = 0; attempt < 50 && got != size; attempt++) {
-        if (attempt) {
-            sceKernelDelayThread(100000);
-            pak_reopen();
-        } else if (pak_gen != g_resume_gen || pak_fd < 0) {
-            pak_reopen();
-        }
-        if (pak_fd < 0)
-            continue;
-        sceIoLseek32(pak_fd, off, PSP_SEEK_SET);
-        got = 0;
-        while (got < size) {
-            int r = sceIoRead(pak_fd, mem + got, size - got);
-            if (r <= 0)
-                break;
-            got += r;
-        }
-    }
-    if (got != size) {
-        free(mem);
-        return 0;
-    }
-    sceKernelDcacheWritebackRange(mem, size);
-    return mem;
-}
 
-int gfx_bundle_loaded(int b) { return bundle_mem[b] != 0; }
-
-int gfx_bundle_load(int b)
-{
-    if (bundle_mem[b])
-        return 0;
-    bundle_mem[b] = pak_read_alloc(g_bundles[b].off, g_bundles[b].size);
-    return bundle_mem[b] ? 0 : -1;
-}
-
-void gfx_bundle_unload(int b)
-{
-    if (!bundle_mem[b])
-        return;
-    sceGuSync(0, 0);
-    free(bundle_mem[b]);
-    bundle_mem[b] = 0;
-    bound_page = -2;
-}
-
-void gfx_bundles_require(const uint8_t *list, int n)
-{
-    /* free first so the new scene's pages fit */
-    for (int b = 0; b < NUM_BUNDLES; b++) {
-        int need = 0;
-        for (int i = 0; i < n; i++)
-            if (list[i] == b)
-                need = 1;
-        if (!need)
-            gfx_bundle_unload(b);
-    }
-    for (int i = 0; i < n; i++)
-        gfx_bundle_load(list[i]);
-}
-
-static int bind_page(int p)
-{
-    if (p == bound_page)
-        return 1;
-    const PageDef *pg = &g_pages[p];
-    uint8_t *base = bundle_mem[pg->bundle];
-    if (!base)
-        return 0;
-    if (pg->psm == 4) {
-        sceGuClutMode(GU_PSM_8888, 0, 0x0f, 0);
-        sceGuClutLoad(2, base + pg->clut);
-        sceGuTexMode(GU_PSM_T4, 0, 0, pg->swz);
-    } else {
-        sceGuClutMode(GU_PSM_8888, 0, 0xff, 0);
-        sceGuClutLoad(32, base + pg->clut);
-        sceGuTexMode(GU_PSM_T8, 0, 0, pg->swz);
-    }
-    sceGuTexImage(0, pg->w, pg->h, pg->w, base + pg->data);
-    sceGuTexFlush();
-    bound_page = p;
-    return 1;
-}
-
-static void set_blend(int additive)
-{
-    if (additive == bound_mode)
-        return;
-    if (additive)
-        sceGuBlendFunc(GU_ADD, GU_SRC_ALPHA, GU_FIX, 0, 0xFFFFFFFF);
-    else
-        sceGuBlendFunc(GU_ADD, GU_SRC_ALPHA, GU_ONE_MINUS_SRC_ALPHA, 0, 0);
-    bound_mode = additive;
-}
-
-static void quad(float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1, uint32_t color)
-{
-    if (x1 < x0) {
-        float t = x0; x0 = x1; x1 = t;
-        t = u0; u0 = u1; u1 = t;
-    }
-    if (y1 < y0) {
-        float t = y0; y0 = y1; y1 = t;
-        t = v0; v0 = v1; v1 = t;
-    }
-    if (x1 < 0 || y1 < 0 || x0 > SCR_W || y0 > SCR_H)
-        return;
-    Vtx *v = sceGuGetMemory(2 * sizeof(Vtx));
-    v[0].u = u0; v[0].v = v0; v[0].color = color; v[0].x = x0; v[0].y = y0; v[0].z = 0;
-    v[1].u = u1; v[1].v = v1; v[1].color = color; v[1].x = x1; v[1].y = y1; v[1].z = 0;
-    sceGuDrawArray(GU_SPRITES, GU_TEXTURE_32BITF | GU_COLOR_8888 | GU_VERTEX_32BITF | GU_TRANSFORM_2D, 2, 0, v);
-}
+int gfx_bundle_loaded(int b) { return vcpe_bundle_loaded(b); }
+int gfx_bundle_load(int b) { return vcpe_bundle_load(b); }
+void gfx_bundle_unload(int b) { vcpe_bundle_unload(b); }
+void gfx_bundles_require(const uint8_t *list, int n) { vcpe_bundles_keep(list, n); }
 
 static void sprite_draw(int spr, float x, float y, float sx, float sy, uint32_t color, int additive)
 {
@@ -234,14 +56,14 @@ static void sprite_draw(int spr, float x, float y, float sx, float sy, uint32_t 
         x = floorf(x + 0.5f);
         y = floorf(y + 0.5f);
     }
-    set_blend(additive);
-    sceGuTexFilter(crisp ? GU_NEAREST : GU_LINEAR, crisp ? GU_NEAREST : GU_LINEAR);
+    vcpe_blend(additive);
+    vcpe_filter(crisp);
     for (int i = 0; i < d->n; i++) {
         const SprPiece *p = &g_pieces[d->first + i];
-        if (!bind_page(p->page))
+        if (!vcpe_bind_page(p->page))
             return;
         float lx0 = d->ox + p->dx, ly0 = d->oy + p->dy;
-        quad(x + lx0 * sx, y + ly0 * sy, x + (lx0 + p->w) * sx, y + (ly0 + p->h) * sy,
+        vcpe_quad(x + lx0 * sx, y + ly0 * sy, x + (lx0 + p->w) * sx, y + (ly0 + p->h) * sy,
              p->u, p->v, p->u + p->w, p->v + p->h, color);
     }
 }
@@ -258,15 +80,15 @@ void gfx_sprite_rot(int spr, float x, float y, float sx, float sy, float deg, ui
         return;
     const SprDef *d = &g_sprites[spr];
     float r = deg * 0.01745329f, c = cosf(r), sn = sinf(r);
-    set_blend(0);
-    sceGuTexFilter(GU_LINEAR, GU_LINEAR);
+    vcpe_blend(0);
+    vcpe_filter(0);
     for (int i = 0; i < d->n; i++) {
         const SprPiece *p = &g_pieces[d->first + i];
-        if (!bind_page(p->page))
+        if (!vcpe_bind_page(p->page))
             return;
         float lx0 = (d->ox + p->dx) * sx, ly0 = (d->oy + p->dy) * sy;
         float lx1 = lx0 + p->w * sx, ly1 = ly0 + p->h * sy;
-        Vtx *v = sceGuGetMemory(4 * sizeof(Vtx));
+        VcpeVtx *v = sceGuGetMemory(4 * sizeof(VcpeVtx));
         float u0 = p->u, v0 = p->v, u1 = p->u + p->w, v1 = p->v + p->h;
         float px[4] = {lx0, lx1, lx0, lx1}, py[4] = {ly0, ly0, ly1, ly1};
         float uu[4] = {u0, u1, u0, u1}, vv[4] = {v0, v0, v1, v1};
@@ -286,7 +108,7 @@ void gfx_sprite_rot90(int spr, float x, float y, float sx, float sy, uint32_t co
 
 void gfx_silhouette(int on)
 {
-    sceGuTexFunc(on ? GU_TFX_ADD : GU_TFX_MODULATE, GU_TCC_RGBA);
+    vcpe_tex_white(on);
 }
 
 void gfx_sprite_additive(int spr, float x, float y, float sx, float sy, uint32_t color)
@@ -303,13 +125,13 @@ void gfx_sprite_rect(int spr, float x, float y, float w, float h, uint32_t color
     float rw = d->rw / 4.0f, rh = d->rh / 4.0f;
     float kx = w / rw, ky = h / rh;
     float bx = d->ox - d->rx / 4.0f, by = d->oy - d->ry / 4.0f;
-    set_blend(0);
-    sceGuTexFilter(GU_LINEAR, GU_LINEAR);
+    vcpe_blend(0);
+    vcpe_filter(0);
     for (int i = 0; i < d->n; i++) {
         const SprPiece *p = &g_pieces[d->first + i];
-        if (!bind_page(p->page))
+        if (!vcpe_bind_page(p->page))
             return;
-        quad(x + (bx + p->dx) * kx, y + (by + p->dy) * ky, x + (bx + p->dx + p->w) * kx, y + (by + p->dy + p->h) * ky,
+        vcpe_quad(x + (bx + p->dx) * kx, y + (by + p->dy) * ky, x + (bx + p->dx + p->w) * kx, y + (by + p->dy + p->h) * ky,
              p->u, p->v, p->u + p->w, p->v + p->h, color);
     }
 }
@@ -317,31 +139,11 @@ void gfx_sprite_rect(int spr, float x, float y, float w, float h, uint32_t color
 int gfx_sprite_w(int spr) { return (spr >= 0 && spr < NUM_SPRITES) ? g_sprites[spr].w : 0; }
 int gfx_sprite_h(int spr) { return (spr >= 0 && spr < NUM_SPRITES) ? g_sprites[spr].h : 0; }
 
-void gfx_rect(float x, float y, float w, float h, uint32_t color)
-{
-    if ((color >> 24) == 0)
-        return;
-    set_blend(0);
-    sceGuDisable(GU_TEXTURE_2D);
-    Vtx *v = sceGuGetMemory(2 * sizeof(Vtx));
-    memset(v, 0, 2 * sizeof(Vtx));
-    v[0].color = v[1].color = color;
-    v[0].x = x; v[0].y = y;
-    v[1].x = x + w; v[1].y = y + h;
-    sceGuDrawArray(GU_SPRITES, GU_TEXTURE_32BITF | GU_COLOR_8888 | GU_VERTEX_32BITF | GU_TRANSFORM_2D, 2, 0, v);
-    sceGuEnable(GU_TEXTURE_2D);
-}
+void gfx_rect(float x, float y, float w, float h, uint32_t color) { vcpe_fill(x, y, w, h, color); }
 
-void gfx_clip(int x, int y, int w, int h)
-{
-    if (x < 0) { w += x; x = 0; }
-    if (y < 0) { h += y; y = 0; }
-    if (w < 0) w = 0;
-    if (h < 0) h = 0;
-    sceGuScissor(x, y, x + w, y + h);
-}
+void gfx_clip(int x, int y, int w, int h) { vcpe_clip(x, y, w, h); }
 
-void gfx_clip_reset(void) { sceGuScissor(0, 0, SCR_W, SCR_H); }
+void gfx_clip_reset(void) { vcpe_clip_reset(); }
 
 void gfx_camera(float cx, float cy) { cam_x = cx; cam_y = cy; }
 void gfx_camera_shake(float ox, float oy) { shake_x = ox; shake_y = oy; }
@@ -388,12 +190,89 @@ static const Glyph *glyph(int font, uint32_t cp)
 
 int gfx_font_line(int font) { return g_fonts[font].line; }
 
-/* strings known at convert time are pre-rendered with real kerning (g_text_spr) */
-static const TextSpr *text_find(int font, const char *s)
+/* ------------------------------------------------------------ LANG.PAK (translations, tools/mklang.py)
+ * pictures of the translated texts under the same keys as g_text_spr (FNV-1a of font + English string) */
+typedef struct { char magic[4]; uint32_t version, kit, nent, npages, ent, pages; char name[32]; } LangHdr;
+typedef struct { uint32_t hash; uint8_t font, page; uint16_t u, v, w, h; int16_t ox, oy; uint16_t adv; } LangEnt;
+typedef struct { uint16_t w, h; uint32_t data, clut; } LangPage;
+static uint8_t *lang_mem;
+static const LangEnt *lang_ent;
+static const LangPage *lang_pages;
+static uint32_t lang_n;
+static int lang_on;
+
+int gfx_lang_load(const char *path)
+{
+    SceUID fd = sceIoOpen(path, PSP_O_RDONLY, 0);
+    if (fd < 0)
+        return -1;
+    int n = sceIoLseek32(fd, 0, PSP_SEEK_END);
+    sceIoLseek32(fd, 0, PSP_SEEK_SET);
+    uint8_t *m = n > (int)sizeof(LangHdr) ? memalign(64, n) : 0;
+    int got = 0, r;
+    while (m && got < n && (r = sceIoRead(fd, m + got, n - got)) > 0)
+        got += r;
+    sceIoClose(fd);
+    const LangHdr *h = (const LangHdr *)m;
+    if (!m || got != n || memcmp(h->magic, "HTLG", 4) || h->version != 1 || h->kit != LANG_KIT ||
+        h->ent + h->nent * sizeof(LangEnt) > (uint32_t)n || h->pages + h->npages * sizeof(LangPage) > (uint32_t)n) {
+        free(m);
+        return -1;
+    }
+    sceKernelDcacheWritebackRange(m, n);
+    lang_mem = m;
+    lang_ent = (const LangEnt *)(m + h->ent);
+    lang_pages = (const LangPage *)(m + h->pages);
+    lang_n = h->nent;
+    lang_on = 1;
+    return 0;
+}
+
+/* the translation's name, or 0 without a usable LANG.PAK */
+const char *gfx_lang_name(void) { return lang_mem ? ((const LangHdr *)lang_mem)->name : 0; }
+void gfx_lang_set(int on) { lang_on = on && lang_mem; }
+int gfx_lang_active(void) { return lang_on; }
+
+static const LangEnt *lang_find(int font, uint32_t h)
+{
+    int lo = 0, hi = (int)lang_n - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) / 2;
+        const LangEnt *e = &lang_ent[mid];
+        if (e->hash == h && e->font == font)
+            return e;
+        if (e->hash < h || (e->hash == h && e->font < font))
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+    return 0;
+}
+
+static void lang_draw(const LangEnt *e, float x, float y, float sc, uint32_t color)
+{
+    const LangPage *pg = &lang_pages[e->page];
+    vcpe_blend(0);
+    vcpe_filter(sc == 1.0f);
+    sceGuClutMode(GU_PSM_8888, 0, 0xff, 0);
+    sceGuClutLoad(32, lang_mem + pg->clut);
+    sceGuTexMode(GU_PSM_T8, 0, 0, 1);
+    sceGuTexImage(0, pg->w, pg->h, pg->w, lang_mem + pg->data);
+    sceGuTexFlush();
+    vcpe_unbind();
+    vcpe_quad(x + e->ox * sc, y + e->oy * sc, x + (e->ox + e->w) * sc, y + (e->oy + e->h) * sc,
+         e->u, e->v, e->u + e->w, e->v + e->h, color);
+}
+
+/* strings known at convert time are pre-rendered with real kerning (g_text_spr, or the LANG.PAK picture) */
+static const TextSpr *text_find_lang(int font, const char *s, const LangEnt **le)
 {
     uint32_t h = 2166136261u ^ (uint32_t)font;
     for (const unsigned char *p = (const unsigned char *)s; *p; p++)
         h = (h ^ *p) * 16777619u;
+    *le = lang_on ? lang_find(font, h) : 0;
+    if (*le)
+        return 0;
     int lo = 0, hi = NUM_TEXT_SPR - 1;
     while (lo <= hi) {
         int mid = (lo + hi) / 2;
@@ -410,7 +289,10 @@ static const TextSpr *text_find(int font, const char *s)
 
 float gfx_text_width(int font, const char *s, float scale)
 {
-    const TextSpr *ts = s ? text_find(font, s) : 0;
+    const LangEnt *le = 0;
+    const TextSpr *ts = s ? text_find_lang(font, s, &le) : 0;
+    if (le)
+        return le->adv / 16.0f * scale;
     if (ts)
         return ts->adv / 16.0f * scale;
     float w = 0;
@@ -431,7 +313,16 @@ float gfx_text(int font, float x, float y, const char *s, uint32_t color, int al
         x -= w * 0.5f;
     else if (align == 2)
         x -= w;
-    const TextSpr *ts = text_find(font, s);
+    const LangEnt *le;
+    const TextSpr *ts = text_find_lang(font, s, &le);
+    if (le) {
+        if (scale == 1.0f) {
+            x = floorf(x + 0.5f);
+            y = floorf(y + 0.5f);
+        }
+        lang_draw(le, x, y, scale, color);
+        return w;
+    }
     if (ts) {
         if (scale == 1.0f) {
             x = floorf(x + 0.5f);
@@ -444,13 +335,13 @@ float gfx_text(int font, float x, float y, const char *s, uint32_t color, int al
         x = floorf(x + 0.5f);
     y = floorf(y + 0.5f);
     float baseline = y + g_fonts[font].ascent * scale;
-    set_blend(0);
-    sceGuTexFilter(scale == 1.0f ? GU_NEAREST : GU_LINEAR, scale == 1.0f ? GU_NEAREST : GU_LINEAR);
+    vcpe_blend(0);
+    vcpe_filter(scale == 1.0f);
     sceGuClutMode(GU_PSM_8888, 0, 0xff, 0);
     sceGuClutLoad(32, font_mem + g_font_clut);
     sceGuTexMode(GU_PSM_T8, 0, 0, 1);
     int cur = -1;
-    bound_page = -2;
+    vcpe_unbind();
     while (*s) {
         const Glyph *g = glyph(font, utf8_next(&s));
         if (!g)
@@ -465,7 +356,7 @@ float gfx_text(int font, float x, float y, const char *s, uint32_t color, int al
             float gx = x + g->bx * scale, gy = baseline + g->by * scale;
             if (scale == 1.0f)
                 gx = floorf(gx + 0.5f);
-            quad(gx, gy, gx + g->w * scale, gy + g->h * scale, g->u, g->v, g->u + g->w, g->v + g->h, color);
+            vcpe_quad(gx, gy, gx + g->w * scale, gy + g->h * scale, g->u, g->v, g->u + g->w, g->v + g->h, color);
         }
         x += g->adv / 16.0f * scale;
     }

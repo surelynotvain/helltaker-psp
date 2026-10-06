@@ -1,6 +1,7 @@
 #ifndef GFX_H
 #define GFX_H
 #include <stdint.h>
+#include "vcpe.h"
 
 #define SCR_W 480
 #define SCR_H 272
@@ -17,13 +18,15 @@ void gfx_begin(uint32_t clear);
 void gfx_end(void);
 
 int gfx_pak_open(const char *path);
+/* translations: LANG.PAK next to the EBOOT (tools/mklang.py) */
+int gfx_lang_load(const char *path);
+const char *gfx_lang_name(void);   /* 0 without a usable LANG.PAK */
+void gfx_lang_set(int on);
+int gfx_lang_active(void);
 int gfx_bundle_load(int bundle);
 void gfx_bundle_unload(int bundle);
 void gfx_bundles_require(const uint8_t *list, int n);
 int gfx_bundle_loaded(int bundle);
-void *pak_read_alloc(uint32_t off, uint32_t size);
-/* bumped by the power callback after a sleep/resume: Memory Stick handles opened before it go stale */
-extern volatile int g_resume_gen;
 
 /* Draw a sprite with its pivot at (x, y) in screen pixels. sx/sy are scale (negative = flip). */
 void gfx_sprite(int spr, float x, float y, float sx, float sy, uint32_t color);

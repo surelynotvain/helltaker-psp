@@ -1,6 +1,9 @@
 # Helltaker PSP engine
 
-This folder contains the source code of the engine that runs Helltaker PSP: a small game engine written from scratch in plain C for the PlayStation Portable.
+This folder contains the source code that runs Helltaker PSP: plain C for the PlayStation Portable, written from scratch. It has two parts:
+
+- `vcpe/src`: **Vain's C Portable Engine** (VCPE), the shared PSP engine base. It is also used by the Awaria PSP port.
+- `src`: the Helltaker game code, built on top of VCPE.
 
 It contains **no game assets and no game data**. Graphics, sound, music, dialogue and level layouts all come from the player's own copy of Helltaker and are not part of this repository.
 
@@ -14,16 +17,30 @@ The engine reproduces Helltaker's gameplay and presentation on PSP hardware:
 - Judgement's boss fight (the sin machine, chains, spikes and HP bar)
 - Examtaker: laser raycasting, generators, the lab monitor and the Arch Mecha Demon boss timeline
 - Pause menu, chapter select, floor pickers, door transitions and credits
+- Language packs (`LANG.PAK`): pictures of translated texts, the start-up language choice and the pause menu switch
 - Streamed music and mixed sound effects
 - Texture bundles loaded per scene to fit the PSP-1000's memory
 
 ## Files
 
+### Vain's C Portable Engine (`vcpe/src`)
+
 | File | Purpose |
 |---|---|
-| `src/main.c` | Startup, input (with anti-mash filtering), save file, scripted test input |
-| `src/gfx.c`, `src/gfx.h` | GU hardware renderer, texture bundles, sprites and text |
-| `src/audio.c`, `src/audio.h` | Sound effect mixer and streamed music |
+| `vcpe.h` | The one header games include |
+| `vcpe_sys.c`, `vcpe_sys.h` | HOME and sleep callbacks, CPU clock, paths next to the EBOOT |
+| `vcpe_pak.c`, `vcpe_pak.h` | Data PAK reader that survives sleep/resume and slow memory sticks |
+| `vcpe_gfx.c`, `vcpe_gfx.h` | GU setup, frames, texture bundles and paletted swizzled pages, cached render state, quads, fills, strips, clipping |
+| `vcpe_audio.c`, `vcpe_audio.h` | Software mixer: ADPCM sound effect voices and streamed ADPCM music, volume and fades |
+| `vcpe_test.c`, `vcpe_test.h` | Scripted test input (`AUTOTEST.TXT`) and frame recording for repeatable runs |
+
+### Helltaker (`src`)
+
+| File | Purpose |
+|---|---|
+| `src/main.c` | Startup, input (with anti-mash filtering), save file, language choice, test commands |
+| `src/gfx.c`, `src/gfx.h` | Sprites and text on top of the VCPE renderer, language packs |
+| `src/audio.c`, `src/audio.h` | Helltaker's sound rules on the VCPE mixer (voices, looping effect, volume levels) |
 | `src/anim.c`, `src/anim.h` | Animator reimplementation |
 | `src/scene.c` | Scene loading, timers, decorations, effects and camera shake |
 | `src/puzzle.c` | Puzzle rules, death, restart and victory flow |
@@ -36,9 +53,9 @@ The engine reproduces Helltaker's gameplay and presentation on PSP hardware:
 
 ## Building
 
-The engine is built with the [pspdev](https://github.com/pspdev/pspdev) toolchain (PSPSDK) as a standard user-mode PSP application.
+The engine is built with the [pspdev](https://github.com/pspdev/pspdev) toolchain (PSPSDK) as a standard user-mode PSP application. Compile the files in `src` and `vcpe/src` together, with both folders on the include path.
 
-It includes a generated header, `gamedata.h`, and links against a generated `gamedata.c`. Those files hold the converted game data (sprite tables, animations, levels, dialogue) and are produced from a Helltaker installation by a separate converter, which is not published. The engine therefore does not build on its own from this repository.
+The game code includes a generated header, `gamedata.h`, and links against a generated `gamedata.c`. Those files hold the converted game data (sprite tables, animations, levels, dialogue) and are produced from a Helltaker installation by a separate converter, which is not published. The engine therefore does not build on its own from this repository.
 
 ## Notes
 

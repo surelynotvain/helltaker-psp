@@ -458,8 +458,29 @@ void game_start(int scene)
     scene_load(scene);
 }
 
+/* main menu + START (only with a LANG.PAK): the door closes, the language picker runs behind it,
+ * then the main menu comes back through the opening door */
+static int lang_pick;   /* 1: door closing, 2: picker due at the next scene load */
+static void lang_pick_now(int a, int b) { (void)a; (void)b; lang_pick = 2; scene_request(0); }
+
+static void lang_pick_update(void)
+{
+    if (lang_pick) {
+        in_pressed = 0;   /* the menu dialogue stays put while the door closes */
+        return;
+    }
+    if (S->kind == SK_MENU && (in_pressed & BTN_START) && gfx_lang_name() && !widget_active() && pending_scene < 0) {
+        lang_pick = 1;
+        in_pressed = 0;
+        P.frozen = 1;
+        door_trigger_close();
+        timer_after(1.0f, lang_pick_now, 0, 0);
+    }
+}
+
 void game_frame(void)
 {
+    lang_pick_update();
     float dt = DT * g_time_scale;
     if (ui_pause_open())
         dt = 0;
@@ -478,6 +499,10 @@ void game_frame(void)
     if (pending_scene >= 0) {
         int n = pending_scene;
         pending_scene = -1;
+        if (lang_pick == 2) {
+            lang_choose();
+            lang_pick = 0;
+        }
         scene_load(n);
     }
 }

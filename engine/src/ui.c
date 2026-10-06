@@ -100,14 +100,23 @@ void door_draw(void)
 /* ------------------------------------------------------------ pause menu */
 static int pause_open, cur_idx = 3, max_idx = 4;
 static int vol[2];
-static float bracket_k[5];
+static float bracket_k[6];
 
 
 int ui_pause_open(void) { return pause_open; }
 
-/* PSP build: volume lives on the console, so only RESUME / SKIP PUZZLE / MAIN MENU */
-static const int order[3] = {3, 4, 2};   /* top to bottom on screen */
-static const float row_y[3] = {95, 132, 169};   /* PSP pixels */
+/* PSP build: volume lives on the console, so only RESUME / SKIP PUZZLE / [LANGUAGE] / MAIN MENU;
+ * LANGUAGE (5) only with a LANG.PAK installed */
+static const int order[4] = {3, 4, 5, 2};   /* top to bottom on screen */
+static int row_visible(int idx) { return idx == 5 ? gfx_lang_name() != 0 : idx <= max_idx; }
+static int pause_rows(int *rows)
+{
+    int n = 0;
+    for (int r = 0; r < 4; r++)
+        if (row_visible(order[r]))
+            rows[n++] = order[r];
+    return n;
+}
 
 static void pause_toggle(void)
 {
@@ -132,6 +141,14 @@ static void pause_update(void)
     }
     if (!pause_open)
         return;
+    if ((in_pressed & BTN_OK) && cur_idx == 5) {
+        /* LANGUAGE: translation <-> English, takes effect at once (every text is looked up when drawn) */
+        sfx_play(SFX_button_menu_confirm_01, 0);
+        gfx_lang_set(!gfx_lang_active());
+        g_save.lang_off = !gfx_lang_active();
+        save_write();
+        return;
+    }
     if ((in_pressed & BTN_OK) && cur_idx > 1) {
         int idx = cur_idx;
         sfx_play(SFX_button_menu_confirm_01, 0);
@@ -154,10 +171,8 @@ static void pause_update(void)
         return;
     }
     if (in_pressed & (BTN_DOWN | BTN_UP)) {
-        int rows[3], n = 0, cur = 0;
-        for (int r = 0; r < 3; r++)
-            if (order[r] <= max_idx)
-                rows[n++] = order[r];
+        int rows[4], cur = 0;
+        int n = pause_rows(rows);
         for (int r = 0; r < n; r++)
             if (rows[r] == cur_idx)
                 cur = r;
@@ -175,18 +190,24 @@ static void pause_draw(void)
     gfx_sprite(SPR_ritBorder, 240 + 55, 132, -1.12f, 1.12f, WHITE);
     gfx_sprite(SPR_ritStar, 240, 228, -1.1f, 1.1f, WHITE);
     gfx_text_fit(FONT_TITLE, 240, 18, g_text_m[4], RGBA(230, 77, 82, 255), 300);
-    for (int r = 0; r < 3; r++) {
-        int idx = order[r];
-        if (idx > max_idx)
-            continue;
-        float y = row_y[r];
+    int rows[4];
+    int n = pause_rows(rows);
+    for (int r = 0; r < n; r++) {
+        int idx = rows[r];
+        /* three rows at 95 / 132 / 169 like before; four share the same span */
+        float y = 95.0f + r * (n > 1 ? 74.0f / (n - 1) : 0.0f);
         int sel = idx == cur_idx;
         bracket_k[idx] += ((sel ? 1.0f : 0.0f) - bracket_k[idx]) * 0.4f;
-        const char *label = idx == 4 && g_scene == 27 ? g_text_hm_m[2] :
+        const char *label = idx == 5 ? (gfx_lang_active() ? "LANGUAGE: TRANSLATION" : "LANGUAGE: ENGLISH") :
+                            idx == 4 && g_scene == 27 ? g_text_hm_m[2] :
                             idx == 4 && S->kind != SK_PUZZLE ? g_text_hm_m[1] : g_text_m[5 + idx];
         /* half_button_R (left, as drawn) at -100 canvas units, half_button_L mirrored at +100: the bracket
          * ends sit outside the label, lines fading inward; ButtonFeedback pulls both 20 px in when selected */
         float off = 25.0f - 6.9f * bracket_k[idx];
+        /* labels wider than the original ones (LANGUAGE, translations) push the brackets out */
+        float lw = gfx_text_width(FONT_MENU, label, 1.0f);
+        if (lw > 220.0f) lw = 220.0f;
+        if (lw * 0.5f > 58.0f) off += lw * 0.5f - 58.0f;
         uint32_t bc = sel ? RED_BRACKET : GREY_BRACKET;
         gfx_sprite(SPR_button_small, 240 - off, y + 1, 1.0f, 1.0f, bc);
         gfx_sprite(SPR_button_small, 240 + off, y + 1, -1.0f, 1.0f, bc);
@@ -388,7 +409,8 @@ void ui_update(void)
 {
     widget_update();
     widget2_update();
-    if (S->kind == SK_PUZZLE || S->kind == SK_BOSS || pause_open)
+    /* the house (chapter11, SK_ABYSS) has its pauseMenu too: it shows the ritual pieces found */
+    if (S->kind == SK_PUZZLE || S->kind == SK_BOSS || S->kind == SK_ABYSS || pause_open)
         pause_update();
 }
 
@@ -442,7 +464,9 @@ static void credits_draw(void)
         for (int k = 0; k < 3 && lines[b][k] >= 0; k++)
             gfx_text_fit(FONT_NAME, 240, ys[b][k] - 8, dlc ? g_text_hm_m[dlc_lines[b][k]] : g_text_m[lines[b][k]],
                          k == 0 ? RGBA(230, 77, 82, 255) : WHITE, 460);
-    /* the port's own credit at the bottom */
+    /* the translator's credit (line 0 of m.json in a translation) and the port's own credit at the bottom */
+    if (gfx_lang_active())
+        gfx_text_fit(FONT_NAME, 240, 163, g_text_m[0], WHITE, 460);
     gfx_text_fit(FONT_NAME, 240, 252, "PSP port by SurelyNotVain", RGBA(230, 77, 82, 255), 460);
 }
 
