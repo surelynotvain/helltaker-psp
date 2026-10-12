@@ -213,7 +213,7 @@ Please do not redistribute modified releases under the same name without clearly
 - ARK compatibility is thanks to the ARK community and its contributors.
 - Polish translation: the official translation by vanripper.
 - Translation fonts: Crimson Pro (The Crimson Pro Project Authors), Amiri (Khaled Hosny) and Segment7 (Cedric Knight), all under the SIL Open Font License 1.1 (see `translation/langkit/fonts/OFL.txt`).
-- PSP port by SurelyNotVain.
+- PSP port by SurelyNotVain and Taliayaya.
 
 All original Helltaker names, characters, artwork, music and related assets belong to their respective creators and rights holders. Helltaker is free on Steam; please support the original creator.
 
