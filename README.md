@@ -58,7 +58,7 @@ The game now runs on **Vain's C Portable Engine 3.4**:
 - Credits
 
 ![Chapter VII](screenshots/chapter_7.png)
-![Judgement](screenshots/judgement_boss.png)
+![Judgement boss fight](screenshots/judgement_boss.png)
 
 ### Examtaker
 
@@ -68,7 +68,7 @@ The game now runs on **Vain's C Portable Engine 3.4**:
 - The Examtaker door transition, the ending with Lucifer and the Examtaker credits
 
 ![Examtaker lab](screenshots/examtaker_lab.png)
-![Examtaker boss](screenshots/examtaker_boss.png)
+![The Arch Mecha Demon defeated](screenshots/examtaker_boss.png)
 ![Loremaster](screenshots/examtaker_dialogue.png)
 
 ### Port features
