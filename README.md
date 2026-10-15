@@ -3,7 +3,7 @@
 
 # Helltaker PSP
 
-![Main menu](screenshots/main_menu.png)
+![Main menu](screenshots/main_menu_2.1.png)
 
 **Helltaker PSP** is a complete fan-made port (demake) of **Helltaker** and its free **Examtaker** bonus chapter for the Sony PlayStation Portable, by SurelyNotVain. It is PSP homebrew with its own engine written in C, packaged as a standard unsigned application for **ARK-4** and **ARK-5**.
 
@@ -57,8 +57,8 @@ The game now runs on **Vain's C Portable Engine 3.4**:
 - The pause menu with the three ritual code panels that fill in as you find the inscriptions (also in the house: with all three found it shows the whole ritual path)
 - Credits
 
-![Chapter VII](screenshots/chapter_7.png)
-![Judgement boss fight](screenshots/judgement_boss.png)
+![Chapter VII](screenshots/chapter_7_2.1.png)
+![Judgement boss fight](screenshots/judgement_boss_2.1.png)
 
 ### Examtaker
 
@@ -67,9 +67,9 @@ The game now runs on **Vain's C Portable Engine 3.4**:
 - Floor VII: the Arch Mecha Demon boss with ground spike waves, laser volleys, cannon bombardments and the eraser beam, across all three phases
 - The Examtaker door transition, the ending with Lucifer and the Examtaker credits
 
-![Examtaker lab](screenshots/examtaker_lab.png)
-![The Arch Mecha Demon defeated](screenshots/examtaker_boss.png)
-![Loremaster](screenshots/examtaker_dialogue.png)
+![Examtaker lab](screenshots/examtaker_lab_2.1.png)
+![The Arch Mecha Demon defeated](screenshots/examtaker_boss_2.1.png)
+![Loremaster](screenshots/examtaker_dialogue_2.1.png)
 
 ### Port features
 
