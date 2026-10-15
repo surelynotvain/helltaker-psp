@@ -120,8 +120,11 @@ def main():
         if t == en_str:
             continue                     # same as English: the built-in picture is used
         used_chars |= set(t)
-        im, ox, oy, adv = htlang.render_text(fi, t, fonts)
-        entries.append((fi, en_str, im, ox, oy, adv))
+        if htlang.BUTTON_RE.search(t):
+            im, ox, oy, adv = htlang.render_text(fi, t, fonts)   # PSP button icons: a picture
+            entries.append((fi, en_str, im, ox, oy, adv))
+        else:
+            entries.append((fi, en_str, t))                       # text: the PSP draws it in the game font
     if not found:
         sys.exit("no translated text files found in " + a.folder)
 
@@ -133,7 +136,7 @@ def main():
                         " (copy langkit/english/psp.json to your folder and translate it; [X] [L] [R] are PSP buttons)")
     missing = sorted(c for c in used_chars if not has_glyph(fonts, c))
     if missing:
-        problems.append("%d characters are not in the game font and show as boxes: %s" % (len(missing), "".join(missing)[:200]))
+        problems.append("%d characters are not in the game font and show as '?': %s" % (len(missing), "".join(missing)[:200]))
     for p in problems:
         print("WARNING:", p)
 

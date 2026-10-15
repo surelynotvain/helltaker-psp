@@ -1,7 +1,8 @@
 # Translating the Helltaker PSP port
 
-The PSP port shows every text as a pre-rendered picture. A translation is one file, `LANG.PAK`,
-with pictures of the translated texts. If `LANG.PAK` sits next to `EBOOT.PBP`, the game uses it;
+The PSP port draws its text itself, in the game font. A translation is one file, `LANG.PAK`,
+with the translated texts (lines with PSP button icons go in as pictures). If `LANG.PAK` sits next to
+`EBOOT.PBP`, the game uses it;
 without it (or with one made for a different version) the game is in English.
 
 You make a `LANG.PAK` from the game's own text files with `mklang.py` from the **translation kit**
@@ -90,9 +91,10 @@ Delete `LANG.PAK` to remove the translation.
 ## 5. Good to know
 
 * The game font covers the Latin alphabets with accents (and more), so most European languages work.
-  Letters it does not have show as boxes.
+  Letters it does not have show as "?".
 * Long dialogue lines are split over two lines where the English text is, otherwise the text is made a
   little smaller to fit. Check your translation on a PSP or in PPSSPP.
 * Text that is part of the artwork stays English, as in the PC game (for example the logo and BAD END).
 * A `LANG.PAK` belongs to the port version whose kit built it. Rebuild it with the new kit when a new
-  version comes out (your text files stay the same).
+  version comes out (your text files stay the same). From version 2.1 the port also still reads the
+  picture-only `LANG.PAK` files made with older kits; older versions cannot read the new ones.

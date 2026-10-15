@@ -9,9 +9,10 @@ LANG.PAK layout (little endian, offsets from the start of the file):
   Ent     {u32 hash; u8 font, page; u16 u, v, w, h; s16 ox, oy; u16 adv}   sorted by (hash, font); adv px*16
   Page    {u16 w, h; u32 data, clut}   8-bit, PSP-swizzled, CLUT 256 x RGBA8888
 Only Pillow and numpy are needed."""
+import math
 import json, os, re, struct, zlib
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 FONTS = [("FONT_TEXT", "CrimsonPro-Medium", 13), ("FONT_NAME", "CrimsonPro-Medium", 14),
          ("FONT_SMALL", "CrimsonPro-Medium", 12), ("FONT_BIG", "Amiri-Regular", 34), ("FONT_TITLE", "CrimsonPro-Medium", 20),
@@ -23,7 +24,7 @@ FONT_ID = {f[0]: i for i, f in enumerate(FONTS)}
 FONT_FILES = ("CrimsonPro-Medium", "Amiri-Regular", "Segment7Standard")
 
 MAGIC = b"HTLG"
-VERSION = 1
+VERSION = 2   # 1: pictures only (older kits; the port still reads them), 2: text entries too
 HDR = "<4sIIIIII32s"
 
 
@@ -129,6 +130,27 @@ def button_icon(kind, h, fi, fonts):
     return im.resize((max(1, im.width // k), max(1, im.height // k)), Image.LANCZOS)
 
 
+SS = 8   # supersampling for unhinted text
+
+
+def text_length(fi, size, text, fonts):
+    """advance width without hinting (FreeType hinting rounds advances at small sizes)"""
+    return fonts.get(fi, size * SS).getlength(text) / SS if text else 0.0
+
+
+def text_mask(text, fi, size, fonts, fx=0.0):
+    """Coverage of one line drawn without hinting: FreeType hints at 12-17 px snap letters to whole pixels, which
+    spaces them unevenly ("absolut e"), so the line is drawn SS times larger and box-filtered down.
+    -> (L image, left, top): the image's top-left relative to the pen start on the line top, fx = pen fraction"""
+    big = fonts.get(fi, size * SS)
+    b = big.getbbox(text)
+    x0, y0 = math.floor((b[0] + fx * SS) / SS), math.floor(b[1] / SS)
+    x1, y1 = math.ceil((b[2] + fx * SS) / SS), math.ceil(b[3] / SS)
+    im = Image.new("L", (max(1, x1 - x0) * SS, max(1, y1 - y0) * SS), 0)
+    ImageDraw.Draw(im).text((fx * SS - x0 * SS, -y0 * SS), text, font=big, fill=255)
+    return im.reduce(SS), x0, y0
+
+
 def render_with_buttons(text, font, fi, size, fonts):
     """-> (RGBA image, ox, oy, advance) with the same pivot convention as plain text."""
     cap = font.getbbox("X")
@@ -143,8 +165,12 @@ def render_with_buttons(text, font, fi, size, fonts):
     for i, part in enumerate(BUTTON_RE.split(text)):
         if i % 2 == 0:
             if part:
-                md.text((M + x, M), part, font=font, fill=255)
-                x += font.getlength(part)
+                px_ = M + x
+                tm, tx, ty = text_mask(part, fi, size, fonts, px_ - math.floor(px_))
+                box = (math.floor(px_) + tx, M + ty)
+                box += (box[0] + tm.width, box[1] + tm.height)
+                mask.paste(ImageChops.lighter(mask.crop(box), tm), box[:2])
+                x += text_length(fi, size, part, fonts)
         else:
             ic = button_icon(part, ih, fi, fonts)
             icons.append((ic, M + x + 1, M + cy - ic.height / 2))
@@ -161,20 +187,20 @@ def render_text(fi, text, fonts):
     """-> (RGBA image, ox, oy, advance); pivot = pen start on the line top (y = baseline - ascent)"""
     size = FONTS[fi][2]
     maxw = FONT_MAXW.get(FONTS[fi][0], 9999)
-    while size > 9 and fonts.get(fi, size).getlength(text) > maxw:
+    while size > 9 and text_length(fi, size, text, fonts) > maxw:
         size -= 1
     font = fonts.get(fi, size)
     if BUTTON_RE.search(text):
         return render_with_buttons(text, font, fi, size, fonts)
-    bbox = font.getbbox(text) if text else (0, 0, 1, 1)
+    if not text:
+        return Image.new("RGBA", (1, 1), (255, 255, 255, 0)), 0, 0, 0
+    tm, x0, y0 = text_mask(text, fi, size, fonts)
     pad = 1
-    w, h = bbox[2] - bbox[0] + 2 * pad, bbox[3] - bbox[1] + 2 * pad
-    im = Image.new("RGBA", (max(1, w), max(1, h)), (255, 255, 255, 0))
+    im = Image.new("RGBA", (tm.width + 2 * pad, tm.height + 2 * pad), (255, 255, 255, 0))
     mask = Image.new("L", im.size, 0)
-    if text:
-        ImageDraw.Draw(mask).text((pad - bbox[0], pad - bbox[1]), text, font=font, fill=255)
+    mask.paste(tm, (pad, pad))
     im.putalpha(mask)
-    return im, bbox[0] - pad, bbox[1] - pad, font.getlength(text) if text else 0
+    return im, x0 - pad, y0 - pad, text_length(fi, size, text, fonts)
 
 
 # ---------------------------------------------------------------- text files
@@ -218,8 +244,12 @@ def _shelf_pack(items, W=512, H=512):
 
 
 def build_pak(entries, name):
-    """entries [(font, english_string, image, ox, oy, adv)] -> LANG.PAK bytes"""
-    imgs = {i: e[2] for i, e in enumerate(entries)}
+    """entries [(font, english_string, image, ox, oy, adv)] (pictures: lines with PSP button icons) or
+    [(font, english_string, translated_string)] (text the PSP draws with its own font renderer) -> LANG.PAK bytes.
+    Version 2: a text entry has page 0xFF, its UTF-8 bytes at offset u | v << 16, length w."""
+    texts = [(i, e) for i, e in enumerate(entries) if len(e) == 3]
+    entries = [e if len(e) == 6 else None for e in entries]
+    imgs = {i: e[2] for i, e in enumerate(entries) if e}
     pages = _shelf_pack(list(imgs.items()))
     where = {}
     page_blobs = []
@@ -253,14 +283,30 @@ def build_pak(entries, name):
             clut += struct.pack("<I", r | (g << 8) | (b << 16) | (al << 24))
         page_blobs.append((512, used_h, swizzle(idx.tobytes(), 512, used_h), bytes(clut)))
     rows = []
-    for i, (fi, en, im, ox, oy, adv) in enumerate(entries):
+    for i, e in enumerate(entries):
+        if not e:
+            continue
+        fi, en, im, ox, oy, adv = e
         pi, x, y = where[i]
         rows.append((fnv(fi, en), fi, pi, x, y, im.width, im.height, int(round(ox)), int(round(oy)), int(round(adv * 16))))
+    strings = bytearray()
+    for i, (fi, en, tr) in texts:
+        b = tr.encode("utf-8")
+        rows.append([fnv(fi, en), fi, 0xFF, len(strings), 0, len(b), 0, 0, 0, 0])
+        strings += b + b"\0"
     rows.sort(key=lambda r: (r[0], r[1]))
     out = bytearray(struct.calcsize(HDR))
     o_ent = len(out)
     for r in rows:
         out += struct.pack("<IBBHHHHhhH", *r)
+    while len(out) % 64:
+        out.append(0)
+    o_str = len(out)
+    out += strings
+    for k, r in enumerate(rows):
+        if r[2] == 0xFF:   # string offsets are relative until here
+            off = o_str + r[3]
+            struct.pack_into("<IBBHHHHhhH", out, o_ent + 20 * k, r[0], r[1], 0xFF, off & 0xFFFF, off >> 16, r[5], 0, 0, 0, 0)
     while len(out) % 64:
         out.append(0)
     o_pages = len(out)
