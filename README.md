@@ -256,3 +256,7 @@ All original Helltaker names, characters, artwork, music and related assets belo
 ## Disclaimer
 
 This project is provided for educational, preservation and entertainment purposes. It is not an official release and comes without any warranty. The developers of this port are not responsible for data loss, storage corruption, console damage or problems caused by firmware modifications or third party plugins.
+
+## AI disclosure
+
+AI tools are used directly in the development of **Vain's C Portable Engine** (VCPE), the PSP engine in [`engine/vcpe`](engine/vcpe/). They are not used to make the demakes themselves: the Helltaker PSP game is not AI-made.
