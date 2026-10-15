@@ -1,6 +1,7 @@
 /* VCPE test harness: if AUTOTEST.TXT sits next to the EBOOT, the input comes from that script
  * (fixed frames, repeatable runs); "rec N" saves every Nth displayed frame to REC.RAW.
- * Built-in commands: wait N | press B | hold B N | rec N | quit. Games add their own. */
+ * Built-in commands: wait N | press B | hold B N | rec N | quit, and snap NAME when the game has none.
+ * Games add their own. */
 #ifndef VCPE_TEST_H
 #define VCPE_TEST_H
 
@@ -19,5 +20,8 @@ extern int vcpe_autotest;                   /* AUTOTEST.TXT was found */
 int vcpe_test_load(const VcpeTestHooks *hooks);   /* 1 if a script runs */
 void vcpe_test_step(unsigned *held);        /* the script's input for this frame */
 void vcpe_test_frame_end(void);             /* after the frame is shown: frame recording */
+/* the screen as shown now -> SNAP<name>.RAW next to the EBOOT (480x272 RGBA). Scripts get it as "snap NAME"
+ * unless the game handles "snap" itself */
+void vcpe_test_snap(const char *name);
 
 #endif

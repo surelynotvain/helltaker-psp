@@ -202,8 +202,8 @@ static void pause_draw(void)
                             idx == 4 && g_scene == 27 ? g_text_hm_m[2] :
                             idx == 4 && S->kind != SK_PUZZLE ? g_text_hm_m[1] : g_text_m[5 + idx];
         /* half_button_R (left, as drawn) at -100 canvas units, half_button_L mirrored at +100: the bracket
-         * ends sit outside the label, lines fading inward; ButtonFeedback pulls both 20 px in when selected */
-        float off = 25.0f - 6.9f * bracket_k[idx];
+         * ends sit outside the label, lines fading inward; ButtonFeedback pushes both 20 px out when selected */
+        float off = 25.0f + 6.9f * bracket_k[idx];
         /* labels wider than the original ones (LANGUAGE, translations) push the brackets out */
         float lw = gfx_text_width(FONT_MENU, label, 1.0f);
         if (lw > 220.0f) lw = 220.0f;

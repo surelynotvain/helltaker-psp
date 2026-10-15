@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include "vcpe.h"
 #include "game.h"
 #include "gfx.h"
 #include "audio.h"
@@ -53,12 +54,7 @@ static void timers_update(float dt)
 
 /* ------------------------------------------------------------ camera shake */
 static float shake_dur, shake_init, shake_amt;
-static unsigned srng = 12345;
-static float frand(void)
-{
-    srng = srng * 1103515245u + 12345u;
-    return ((srng >> 8) & 0xFFFF) / 32768.0f - 1.0f;
-}
+static float frand(void) { return vcpe_frand() * 2.0f - 1.0f; }   /* -1..1 */
 
 void cam_shake(float dur, float amount)
 {
@@ -98,7 +94,7 @@ void vfx_spawn_any(const int *clips, int n, float wx, float wy, int layer, int j
 {
     if (n <= 0)
         return;
-    int c = clips[(unsigned)rand() % n];
+    int c = clips[vcpe_irand(n)];
     if (jitter) { /* RandomizeVfx(random: true): +-0.1 */
         wx += frand() * 0.1f;
         wy += frand() * 0.1f;
@@ -377,10 +373,31 @@ void scene_request(int index)
 
 int scene_kind(void) { return S ? S->kind : SK_UNSUPPORTED; }
 
+int g_load_snap;
+static void scene_load_inner(int n);
+
+/* VCPE 3.4: a scene swap runs behind the loading screen (shown only when it takes over 150 ms) */
 static void scene_load(int n)
 {
     if (n < 0 || n >= NUM_SCENES || g_scenes[n].kind == SK_UNSUPPORTED)
         n = 0;
+    uint32_t bytes = 0;
+    for (int i = 0; i < g_scenes[n].nbundles; i++)
+        if (!gfx_bundle_loaded(g_scenes[n].bundles[i]))
+            bytes += g_bundles[g_scenes[n].bundles[i]].size;
+    vcpe_loading_begin(bytes);
+    scene_load_inner(n);
+    vcpe_loading_end();
+    if (vcpe_autotest)
+        printf("[ht] scene %d loaded, loading screen frames %d, heap free %d KB\n", n, vcpe_loading_shown(), vcpe_heap_kb());
+    if (g_load_snap && vcpe_loading_shown()) {
+        g_load_snap = 0;
+        vcpe_test_snap("LOAD");   /* SNAPLOAD.RAW: the last frame of this loading screen */
+    }
+}
+
+static void scene_load_inner(int n)
+{
     g_scene = n;
     S = &g_scenes[n];
 #ifdef BOSS_DEBUG

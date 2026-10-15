@@ -71,7 +71,7 @@ static const int bone_spr[14] = {SPR_particle0001, SPR_particle0001, SPR_particl
     SPR_particle0002, SPR_particle0006, SPR_particle0006, SPR_particle0007, SPR_particle0008, SPR_particle0004,
     SPR_particle0004, SPR_particle0003, SPR_particle0003};
 
-static float frnd(float a, float b) { return a + (b - a) * (rand() % 10000) / 10000.0f; }
+static float frnd(float a, float b) { return a + (b - a) * vcpe_frand(); }
 
 static void bones_spawn(float x, float y)
 {
@@ -87,7 +87,7 @@ static void bones_spawn(float x, float y)
         bones[i].life = frnd(0.4f, 0.6f);
         bones[i].t = 0;
         bones[i].spr = bone_spr[k];
-        bones[i].flip = rand() & 1;
+        bones[i].flip = vcpe_irand(2);
         k++;
     }
 }
@@ -689,8 +689,8 @@ static void draw_ent_anim(Ent *e, float sx, uint32_t col)
     anim_eval(&e->anim, &o);
     float x = e->px, y = e->py;
     if (e->shake > 0) {
-        x += ((rand() % 200) / 100.0f - 1.0f) * e->shake;
-        y += ((rand() % 200) / 100.0f - 1.0f) * e->shake;
+        x += (vcpe_frand() * 2.0f - 1.0f) * e->shake;
+        y += (vcpe_frand() * 2.0f - 1.0f) * e->shake;
     }
     gfx_sprite(o.spr, gfx_wx(x), gfx_wy(y), sx, 1, col);
 }
@@ -721,8 +721,8 @@ void puzzle_draw_layer(int layer)
                     continue;
                 float x = e->px, y = e->py;
                 if (e->shake > 0) {
-                    x += ((rand() % 200) / 100.0f - 1.0f) * e->shake;
-                    y += ((rand() % 200) / 100.0f - 1.0f) * e->shake;
+                    x += (vcpe_frand() * 2.0f - 1.0f) * e->shake;
+                    y += (vcpe_frand() * 2.0f - 1.0f) * e->shake;
                 }
                 gfx_sprite(e->spr, gfx_wx(x), gfx_wy(y), e->flip ? -1 : 1, 1, WHITE);
             }

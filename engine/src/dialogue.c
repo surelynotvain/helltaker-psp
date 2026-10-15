@@ -32,6 +32,61 @@ static int talker_kind;             /* CHARA_* or 0 */
 static int talker_spr = SPR_NONE;   /* newSprite override for the root part */
 static float talker_dx, talker_a, talker_t;
 static Animator part_anim[MAX_PARTS];
+/* D_charaScript spawns, children of the talker: maid (at Start, talker x - 4.75) and two slaves (3.2 s: x - 2,
+ * 3.4 s: x + 6); each runs its own SmoothShowup (2 units left, fade in) and moves with the talker */
+enum { SP_MAID, SP_SLAVE1, SP_SLAVE2, NUM_SPAWN };
+static struct { int spr; float x, y, goal, a; uint8_t on, settled; } spawn[NUM_SPAWN];
+static int maid_pending;
+
+static float talker_x(void)
+{
+    const PrefabDef *pf = &g_prefabs[talker_kind];
+    return pf->x / 256.0f - (pf->slide ? 2.0f - talker_dx : 0);
+}
+
+static void spawn_start(int i, int spr, int a, float x)
+{
+    if (spr == 0xFFFF)
+        return;
+    spawn[i].spr = spr;
+    spawn[i].x = x;
+    spawn[i].y = g_prefabs[talker_kind].y / 256.0f;
+    spawn[i].goal = x - 2.0f;
+    spawn[i].a = a / 255.0f;
+    spawn[i].on = 1;
+    spawn[i].settled = 0;
+}
+
+/* after the talker's own SmoothShowup step this frame (old_x: its x before the step) */
+static void spawn_update(float old_x)
+{
+    const PrefabDef *pf = &g_prefabs[talker_kind];
+    float tx = talker_x();
+    if (maid_pending) {   /* Start: the talker's first showup step has already run */
+        maid_pending = 0;
+        spawn_start(SP_MAID, pf->maid, pf->maid_a, tx - 4.75f);
+        return;
+    }
+    if (!spawn[SP_SLAVE1].on && talker_t >= 3.2f)
+        spawn_start(SP_SLAVE1, pf->slave, pf->slave_a, tx - 2.0f);
+    else if (spawn[SP_SLAVE1].on && !spawn[SP_SLAVE2].on && talker_t >= 3.4f)
+        spawn_start(SP_SLAVE2, pf->slave, pf->slave_a, tx + 6.0f);
+    for (int i = 0; i < NUM_SPAWN; i++) {
+        if (!spawn[i].on)
+            continue;
+        spawn[i].x += tx - old_x;   /* children move with the talker */
+        if (spawn[i].settled)
+            continue;
+        spawn[i].x += (spawn[i].goal - spawn[i].x) * 0.2f;
+        spawn[i].a += (1 - spawn[i].a) * 0.1f;
+        float d = spawn[i].x - spawn[i].goal;
+        if (d * d <= 0.0002f) {
+            spawn[i].x = spawn[i].goal;
+            spawn[i].a = 1;
+            spawn[i].settled = 1;
+        }
+    }
+}
 /* text */
 static const char *name_text, *text1, *text2;
 static int text_bad;
@@ -133,6 +188,13 @@ static void mask_done(void)
                 save_write();
             }
             puzzle_dialogue_closed(D->epilogue);
+            if (D->next >= 0) {
+                /* GoalSprite.nextDialogue is moved onto this tile: its trigger fires at once under the player, who
+                 * stays frozen (chapters V/VI: after the inscription the demon's dialogue starts) */
+                talker_kind = 0;
+                dlg_start(D->next);
+                return;
+            }
             P.frozen = 0;
             P.player_turn = 1;
         }
@@ -152,11 +214,11 @@ static void prefab_sound(void *u, int fn, int arg)
         if (s[k] >= 0)
             sfx_play(s[k], 0);
     } else if (fn == EVT_twoPlay) {
-        int k = 7 + (rand() & 1);
+        int k = 7 + vcpe_irand(2);
         if (s[k] >= 0)
             sfx_play(s[k], 0);
     } else if (fn == EVT_fourPlay) {
-        int k = 3 + (rand() & 3);
+        int k = 3 + vcpe_irand(4);
         if (s[k] >= 0)
             sfx_play(s[k], 1);
     }
@@ -168,11 +230,16 @@ static void set_talker(int kind, int spr)
     talker_kind = kind;
     talker_spr = spr;
     talker_t = 0;
+    memset(spawn, 0, sizeof spawn);
+    maid_pending = pf->maid != 0xFFFF;
     for (int i = 0; i < pf->n && i < MAX_PARTS; i++)
         anim_init(&part_anim[i], g_prefab_parts[pf->first + i].ctrl);
     if (pf->slide) {
         talker_dx = 2.0f;   /* D_charaScript: spawn, then ease 2 units left while fading in */
-        talker_a = 0;
+        talker_a = 0;   /* Color.Lerp from the prefab's colour (Lucifer's is opaque already) */
+        for (int i = 0; i < pf->n; i++)
+            if (g_prefab_parts[pf->first + i].root)
+                talker_a = g_prefab_parts[pf->first + i].a / 255.0f;
     } else {
         talker_dx = 0;
         talker_a = 1;
@@ -304,6 +371,7 @@ void dlg_update(void)
     }
     ui_slide += ((ui_hidden ? 1.0f : 0.0f) - ui_slide) * 0.15f;
     /* D_charaScript.SmoothShowup */
+    float old_x = talker_kind ? talker_x() : 0;
     if (talker_dx > 0.0001f || talker_a < 1) {
         talker_dx += (0 - talker_dx) * 0.2f;
         talker_a += (1 - talker_a) * 0.1f;
@@ -314,6 +382,7 @@ void dlg_update(void)
     }
     talker_t += dt;
     if (talker_kind) {
+        spawn_update(old_x);
         const PrefabDef *pf = &g_prefabs[talker_kind];
         for (int i = 0; i < pf->n && i < MAX_PARTS; i++)
             anim_update(&part_anim[i], dt, prefab_sound, 0);
@@ -428,7 +497,11 @@ void dlg_draw_world(void)
         /* above the band the portrait is only cut once the band starts closing */
         gfx_clip(0, mask_goal > 0 ? 0 : top - 140 * mask, SCR_W, band + (mask_goal > 0 ? top : 140 * mask));
     }
-    float rx = pf->x / 256.0f - (pf->slide ? 2.0f - talker_dx : 0), ry = pf->y / 256.0f;
+    /* the spawns sort behind the talker (order 3 vs 4; the maid ties with her order-3 talker, drawn first) */
+    for (int i = 0; i < NUM_SPAWN; i++)
+        if (spawn[i].on && spawn[i].a > 0.003f)
+            gfx_sprite(spawn[i].spr, gfx_wx(spawn[i].x), gfx_wy(spawn[i].y), 1.0f, 1.0f, RGBA(255, 255, 255, (int)(spawn[i].a * 255)));
+    float rx = talker_x(), ry = pf->y / 256.0f;
     for (int i = 0; i < pf->n && i < MAX_PARTS; i++) {
         const PrefabPart *pp = &g_prefab_parts[pf->first + i];
         int spr = pp->spr;

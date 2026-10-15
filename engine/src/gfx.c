@@ -13,7 +13,7 @@
 
 
 
-static uint8_t *font_mem;
+static VcpeTtf *ttf[NUM_TTF];   /* the game fonts (OFL files in HT.PAK), rasterized on the PSP by vcpe_ttf */
 static float cam_x, cam_y, shake_x, shake_y;
 
 
@@ -27,16 +27,25 @@ void gfx_shutdown(void) { vcpe_gfx_shutdown(); }
 
 void gfx_begin(uint32_t clear) { vcpe_gfx_begin(clear); }
 
-void gfx_end(void) { vcpe_gfx_end(); }
+int g_perf;
 
-
-int gfx_pak_open(const char *path)
+void gfx_end(void)
 {
-    int fd = vcpe_pak_open(path);
-    if (fd < 0)
-        return fd;
-    font_mem = vcpe_pak_read_alloc(g_font_off, g_font_size);
-    return font_mem ? 0 : -1;
+    if (g_perf)
+        vcpe_hud_perf();
+    vcpe_gfx_end();
+}
+
+
+/* HT.PAK next to the EBOOT, checked against this build (missing / cut short / other version: error screen) */
+void gfx_pak_open(void)
+{
+    vcpe_pak_open_checked("HT.PAK", "Helltaker", "HTPK", PAK_SIZE, 1);
+    for (int i = 0; i < NUM_TTF; i++) {
+        void *mem = vcpe_pak_read_alloc(g_ttf_off[i], g_ttf_size[i]);   /* kept for the whole run */
+        if (!mem || !(ttf[i] = vcpe_ttf_open(mem, g_ttf_size[i])))
+            vcpe_fatal("Helltaker", "HT.PAK could not be read.\n\nCopy EBOOT.PBP and all the PAK files again.");
+    }
 }
 
 
@@ -79,7 +88,7 @@ void gfx_sprite_rot(int spr, float x, float y, float sx, float sy, float deg, ui
     if (spr < 0 || spr >= NUM_SPRITES || (color >> 24) == 0)
         return;
     const SprDef *d = &g_sprites[spr];
-    float r = deg * 0.01745329f, c = cosf(r), sn = sinf(r);
+    float c = vcpe_cos_deg(deg), sn = vcpe_sin_deg(deg);
     vcpe_blend(0);
     vcpe_filter(0);
     for (int i = 0; i < d->n; i++) {
@@ -97,6 +106,7 @@ void gfx_sprite_rot(int spr, float x, float y, float sx, float sy, float deg, ui
             v[k].x = x + px[k] * c + py[k] * sn;
             v[k].y = y - px[k] * sn + py[k] * c;
         }
+        vcpe_gfx_flush();
         sceGuDrawArray(GU_TRIANGLE_STRIP, GU_TEXTURE_32BITF | GU_COLOR_8888 | GU_VERTEX_32BITF | GU_TRANSFORM_2D, 4, 0, v);
     }
 }
@@ -151,47 +161,12 @@ float gfx_wx(float wx) { return SCR_W * 0.5f + (wx - cam_x - shake_x) * PXU; }
 float gfx_wy(float wy) { return SCR_H * 0.5f - (wy - cam_y - shake_y) * PXU; }
 
 /* ------------------------------------------------------------------ text */
-static uint32_t utf8_next(const char **ps)
-{
-    const unsigned char *s = (const unsigned char *)*ps;
-    uint32_t c = *s++;
-    if (c >= 0xF0) {
-        c = ((c & 7) << 18) | ((s[0] & 63) << 12) | ((s[1] & 63) << 6) | (s[2] & 63);
-        s += 3;
-    } else if (c >= 0xE0) {
-        c = ((c & 15) << 12) | ((s[0] & 63) << 6) | (s[1] & 63);
-        s += 2;
-    } else if (c >= 0xC0) {
-        c = ((c & 31) << 6) | (s[0] & 63);
-        s += 1;
-    }
-    *ps = (const char *)s;
-    return c;
-}
-
-static const Glyph *glyph(int font, uint32_t cp)
-{
-    const FontDef *f = &g_fonts[font];
-    int lo = 0, hi = f->n - 1;
-    while (lo <= hi) {
-        int mid = (lo + hi) / 2;
-        const Glyph *g = &g_glyphs[f->first + mid];
-        if (g->cp == cp)
-            return g;
-        if (g->cp < cp)
-            lo = mid + 1;
-        else
-            hi = mid - 1;
-    }
-    if (cp != '?')
-        return glyph(font, '?');
-    return 0;
-}
-
 int gfx_font_line(int font) { return g_fonts[font].line; }
 
 /* ------------------------------------------------------------ LANG.PAK (translations, tools/mklang.py)
- * pictures of the translated texts under the same keys as g_text_spr (FNV-1a of font + English string) */
+ * the translated texts under the same keys as g_text_spr (FNV-1a of font + English string). Version 1: pictures.
+ * Version 2: the translated string (page 0xFF, UTF-8 at u | v << 16, w bytes), drawn like the English text;
+ * pictures only for lines with PSP button icons */
 typedef struct { char magic[4]; uint32_t version, kit, nent, npages, ent, pages; char name[32]; } LangHdr;
 typedef struct { uint32_t hash; uint8_t font, page; uint16_t u, v, w, h; int16_t ox, oy; uint16_t adv; } LangEnt;
 typedef struct { uint16_t w, h; uint32_t data, clut; } LangPage;
@@ -214,8 +189,15 @@ int gfx_lang_load(const char *path)
         got += r;
     sceIoClose(fd);
     const LangHdr *h = (const LangHdr *)m;
-    if (!m || got != n || memcmp(h->magic, "HTLG", 4) || h->version != 1 || h->kit != LANG_KIT ||
-        h->ent + h->nent * sizeof(LangEnt) > (uint32_t)n || h->pages + h->npages * sizeof(LangPage) > (uint32_t)n) {
+    int bad = !m || got != n || memcmp(h->magic, "HTLG", 4) || (h->version != 1 && h->version != 2) ||
+              h->kit != LANG_KIT || h->ent + h->nent * sizeof(LangEnt) > (uint32_t)n ||
+              h->pages + h->npages * sizeof(LangPage) > (uint32_t)n;
+    for (uint32_t i = 0; !bad && i < h->nent; i++) {
+        const LangEnt *e = (const LangEnt *)(m + h->ent) + i;
+        uint32_t off = e->u | (uint32_t)e->v << 16;
+        bad = e->page == 0xFF ? (h->version < 2 || off + e->w >= (uint32_t)n || m[off + e->w] != 0) : e->page >= h->npages;
+    }
+    if (bad) {
         free(m);
         return -1;
     }
@@ -254,6 +236,7 @@ static void lang_draw(const LangEnt *e, float x, float y, float sc, uint32_t col
     const LangPage *pg = &lang_pages[e->page];
     vcpe_blend(0);
     vcpe_filter(sc == 1.0f);
+    vcpe_gfx_flush();
     sceGuClutMode(GU_PSM_8888, 0, 0xff, 0);
     sceGuClutLoad(32, lang_mem + pg->clut);
     sceGuTexMode(GU_PSM_T8, 0, 0, 1);
@@ -264,102 +247,100 @@ static void lang_draw(const LangEnt *e, float x, float y, float sc, uint32_t col
          e->u, e->v, e->u + e->w, e->v + e->h, color);
 }
 
-/* strings known at convert time are pre-rendered with real kerning (g_text_spr, or the LANG.PAK picture) */
-static const TextSpr *text_find_lang(int font, const char *s, const LangEnt **le)
+/* What a string draws as. Pictures: a LANG.PAK v1 picture, or a line with PSP button icons pre-rendered on the PC
+ * (g_text_spr). Everything else is text in the game font at the font's size, made smaller (like the PC converter
+ * did) while it is wider than the font's maxw. */
+typedef struct {
+    const LangEnt *pic;
+    const TextSpr *spr;
+    const char *s;
+    VcpeTtf *f;
+    int size;
+} TextRun;
+
+static void text_resolve(int font, const char *s, TextRun *r)
 {
+    memset(r, 0, sizeof *r);
     uint32_t h = 2166136261u ^ (uint32_t)font;
     for (const unsigned char *p = (const unsigned char *)s; *p; p++)
         h = (h ^ *p) * 16777619u;
-    *le = lang_on ? lang_find(font, h) : 0;
-    if (*le)
-        return 0;
-    int lo = 0, hi = NUM_TEXT_SPR - 1;
-    while (lo <= hi) {
-        int mid = (lo + hi) / 2;
-        const TextSpr *t = &g_text_spr[mid];
-        if (t->hash == h && t->font == font)
-            return gfx_bundle_loaded(g_sprites[t->spr].bundle) ? t : 0;
-        if (t->hash < h || (t->hash == h && t->font < font))
-            lo = mid + 1;
-        else
-            hi = mid - 1;
+    const LangEnt *le = lang_on ? lang_find(font, h) : 0;
+    if (le && le->page != 0xFF) {
+        r->pic = le;
+        return;
     }
-    return 0;
+    if (le) {
+        s = (const char *)lang_mem + (le->u | (uint32_t)le->v << 16);
+    } else {
+        int lo = 0, hi = NUM_TEXT_SPR - 1;
+        while (lo <= hi) {
+            int mid = (lo + hi) / 2;
+            const TextSpr *t = &g_text_spr[mid];
+            if (t->hash == h && t->font == font) {
+                if (gfx_bundle_loaded(g_sprites[t->spr].bundle)) {
+                    r->spr = t;
+                    return;
+                }
+                break;
+            }
+            if (t->hash < h || (t->hash == h && t->font < font))
+                lo = mid + 1;
+            else
+                hi = mid - 1;
+        }
+    }
+    const FontDef *fd = &g_fonts[font];
+    r->s = s;
+    r->f = ttf[fd->ttf];
+    r->size = fd->px;
+    if (fd->maxw)
+        while (r->size > 9 && vcpe_ttf_width(r->f, r->size, s) > fd->maxw)
+            r->size--;
+}
+
+static float run_width(const TextRun *r, float scale)
+{
+    if (r->pic)
+        return r->pic->adv / 16.0f * scale;
+    if (r->spr)
+        return r->spr->adv / 16.0f * scale;
+    return r->f ? vcpe_ttf_width(r->f, r->size * scale, r->s) : 0;
 }
 
 float gfx_text_width(int font, const char *s, float scale)
 {
-    const LangEnt *le = 0;
-    const TextSpr *ts = s ? text_find_lang(font, s, &le) : 0;
-    if (le)
-        return le->adv / 16.0f * scale;
-    if (ts)
-        return ts->adv / 16.0f * scale;
-    float w = 0;
-    while (s && *s) {
-        const Glyph *g = glyph(font, utf8_next(&s));
-        if (g)
-            w += g->adv / 16.0f;
-    }
-    return w * scale;
+    if (!s)
+        return 0;
+    TextRun r;
+    text_resolve(font, s, &r);
+    return run_width(&r, scale);
 }
 
 float gfx_text(int font, float x, float y, const char *s, uint32_t color, int align, float scale)
 {
-    if (!s || !font_mem)
+    if (!s || (color >> 24) == 0)
         return 0;
-    float w = gfx_text_width(font, s, scale);
+    TextRun r;
+    text_resolve(font, s, &r);
+    float w = run_width(&r, scale);
     if (align == 1)
         x -= w * 0.5f;
     else if (align == 2)
         x -= w;
-    const LangEnt *le;
-    const TextSpr *ts = text_find_lang(font, s, &le);
-    if (le) {
+    if (r.pic || r.spr) {
         if (scale == 1.0f) {
             x = floorf(x + 0.5f);
             y = floorf(y + 0.5f);
         }
-        lang_draw(le, x, y, scale, color);
+        if (r.pic)
+            lang_draw(r.pic, x, y, scale, color);
+        else
+            gfx_sprite(r.spr->spr, x, y, scale, scale, color);
         return w;
     }
-    if (ts) {
-        if (scale == 1.0f) {
-            x = floorf(x + 0.5f);
-            y = floorf(y + 0.5f);
-        }
-        gfx_sprite(ts->spr, x, y, scale, scale, color);
-        return w;
-    }
-    if (scale == 1.0f)
-        x = floorf(x + 0.5f);
-    y = floorf(y + 0.5f);
-    float baseline = y + g_fonts[font].ascent * scale;
-    vcpe_blend(0);
-    vcpe_filter(scale == 1.0f);
-    sceGuClutMode(GU_PSM_8888, 0, 0xff, 0);
-    sceGuClutLoad(32, font_mem + g_font_clut);
-    sceGuTexMode(GU_PSM_T8, 0, 0, 1);
-    int cur = -1;
-    vcpe_unbind();
-    while (*s) {
-        const Glyph *g = glyph(font, utf8_next(&s));
-        if (!g)
-            continue;
-        if (g->w) {
-            if (g->page != cur) {
-                const FontPage *fp = &g_font_pages[g->page];
-                sceGuTexImage(0, fp->w, fp->h, fp->w, font_mem + fp->off);
-                sceGuTexFlush();
-                cur = g->page;
-            }
-            float gx = x + g->bx * scale, gy = baseline + g->by * scale;
-            if (scale == 1.0f)
-                gx = floorf(gx + 0.5f);
-            vcpe_quad(gx, gy, gx + g->w * scale, gy + g->h * scale, g->u, g->v, g->u + g->w, g->v + g->h, color);
-        }
-        x += g->adv / 16.0f * scale;
-    }
+    /* (x, y) is the pen start on the line top: the baseline sits one ascent (of the size drawn) lower */
+    float px = r.size * scale;
+    vcpe_ttf_draw(r.f, px, x, y + vcpe_ttf_ascent(r.f, r.size) * scale, r.s, color);
     return w;
 }
 
