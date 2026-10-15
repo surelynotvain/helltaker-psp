@@ -119,7 +119,7 @@ static void bomb_event(void *u, int fn, int arg)
     if (fn == EVT_Impact) {
         int i = (int)(intptr_t)u;
         for (int k = 0; k < 3; k++)
-            vfx_spawn_any(CLIP_DUST, 3, bombs[i].x + (rand() % 10 - 5) * 0.1f, bombs[i].y + (rand() % 10 - 5) * 0.1f, 4, 0);
+            vfx_spawn_any(CLIP_DUST, 3, bombs[i].x + (vcpe_irand(10) - 5) * 0.1f, bombs[i].y + (vcpe_irand(10) - 5) * 0.1f, 4, 0);
     }
 }
 

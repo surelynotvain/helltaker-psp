@@ -26,11 +26,26 @@ Save g_save;
 
 
 #define SAVE_MAGIC 0x48545031 /* HTP1 */
+#define SAVE_FILE "SETTINGS.BIN"
+#define SAVE_VERSION 1
 
+static void save_defaults(void)
+{
+    memset(&g_save, 0, sizeof g_save);
+    g_save.magic = SAVE_MAGIC;
+    g_save.music_vol = 2;  /* PlayerPrefs defaults */
+    g_save.sfx_vol = 3;
+    g_save.chapter_reached = 0;
+}
+
+/* VCPE checked two-slot save (SETTINGS.BIN + SETTINGS.BIN.BAK); a save from 2.0 or older is the plain struct in
+ * SETTINGS.BIN, read once as a fallback so players keep their progress (the next save_write replaces it) */
 static void save_read(void)
 {
+    if (vcpe_save_read(SAVE_FILE, &g_save, sizeof g_save, SAVE_VERSION) == 0 && g_save.magic == SAVE_MAGIC)
+        return;
     char p[300];
-    vcpe_path(p, sizeof p, "SETTINGS.BIN");
+    vcpe_path(p, sizeof p, SAVE_FILE);
     memset(&g_save, 0, sizeof g_save);
     int fd = sceIoOpen(p, PSP_O_RDONLY, 0);
     int got = 0;
@@ -39,24 +54,13 @@ static void save_read(void)
         sceIoClose(fd);
     }
     /* saves from before Examtaker are 8 bytes (no dlc_progress); anything shorter is truncated */
-    if (got < 8 || g_save.magic != SAVE_MAGIC) {
-        memset(&g_save, 0, sizeof g_save);
-        g_save.magic = SAVE_MAGIC;
-        g_save.music_vol = 2;  /* PlayerPrefs defaults */
-        g_save.sfx_vol = 3;
-        g_save.chapter_reached = 0;
-    }
+    if (got < 8 || g_save.magic != SAVE_MAGIC)
+        save_defaults();
 }
 
 void save_write(void)
 {
-    char p[300];
-    vcpe_path(p, sizeof p, "SETTINGS.BIN");
-    int fd = sceIoOpen(p, PSP_O_WRONLY | PSP_O_CREAT | PSP_O_TRUNC, 0777);
-    if (fd >= 0) {
-        sceIoWrite(fd, &g_save, sizeof g_save);
-        sceIoClose(fd);
-    }
+    vcpe_save_write(SAVE_FILE, &g_save, sizeof g_save, SAVE_VERSION);
 }
 
 /* ------------------------------------------------------------ autotest
@@ -68,21 +72,14 @@ void save_write(void)
  *   quit         exit (the emulator saves its screenshot)                         */
 int g_test_god;
 
-static unsigned btn_from(const char *s)
-{
-    if (!strcmp(s, "up")) return BTN_UP;
-    if (!strcmp(s, "down")) return BTN_DOWN;
-    if (!strcmp(s, "left")) return BTN_LEFT;
-    if (!strcmp(s, "right")) return BTN_RIGHT;
-    if (!strcmp(s, "ok")) return BTN_OK;
-    if (!strcmp(s, "back")) return BTN_BACK;
-    if (!strcmp(s, "start")) return BTN_START;
-    if (!strcmp(s, "r")) return BTN_RESTART;
-    if (!strcmp(s, "l")) return BTN_ADVICE;
-    return 0;
-}
+/* the PSP buttons behind each game button; the stick works as the d-pad (vcpe_pad, threshold 50/205) */
+static const VcpePadBind binds[] = {
+    {PSP_CTRL_UP, BTN_UP}, {PSP_CTRL_DOWN, BTN_DOWN}, {PSP_CTRL_LEFT, BTN_LEFT}, {PSP_CTRL_RIGHT, BTN_RIGHT},
+    {PSP_CTRL_CROSS, BTN_OK}, {PSP_CTRL_CIRCLE, BTN_BACK}, {PSP_CTRL_START, BTN_START},
+    {PSP_CTRL_RTRIGGER | PSP_CTRL_SQUARE, BTN_RESTART}, {PSP_CTRL_LTRIGGER | PSP_CTRL_TRIANGLE, BTN_ADVICE}};
 
 /* Helltaker's own test commands (the engine handles wait / press / hold / rec / quit) */
+extern int g_load_snap;   /* scene.c */
 static int test_command(const char *cmd, const char *arg, int num, int num2, const char *line, unsigned *held)
 {
     (void)num2; (void)line; (void)held;
@@ -101,6 +98,12 @@ static int test_command(const char *cmd, const char *arg, int num, int num2, con
     } else if (!strcmp(cmd, "amdhit")) {   /* kick the AMD core (phase 3: the kill) */
         extern void amd_core_hit(void);
         amd_core_hit();
+    } else if (!strcmp(cmd, "loadshow")) {
+        vcpe_loading_show_after(atoi(arg));   /* emulator loads are fast: 0 shows the loading screen every time */
+        return VCPE_CMD_NEXT;
+    } else if (!strcmp(cmd, "loadsnap")) {
+        g_load_snap = 1;
+        return VCPE_CMD_NEXT;
     } else if (!strcmp(cmd, "god")) {
         g_test_god = 1;   /* autotest only: hazards don't kill */
     } else if (!strcmp(cmd, "pos")) {
@@ -111,9 +114,11 @@ static int test_command(const char *cmd, const char *arg, int num, int num2, con
     return VCPE_CMD_FRAME;
 }
 
+
+
 static void script_load(void)
 {
-    static const VcpeTestHooks hooks = {btn_from, test_command, 0, 0, 1};
+    static const VcpeTestHooks hooks = {vcpe_pad_button, test_command, 0, 0, 1};
     vcpe_test_load(&hooks);
 }
 
@@ -144,7 +149,7 @@ void lang_choose(void)
             k[i] += ((i == sel ? 1.0f : 0.0f) - k[i]) * 0.4f;
             /* the pause menu's brackets, pushed out for wide names */
             float lw = gfx_text_width(FONT_MENU, label[i], 1.0f);
-            float off = 25.0f - 6.9f * k[i] + (lw * 0.5f > 58.0f ? lw * 0.5f - 58.0f : 0.0f);
+            float off = 25.0f + 6.9f * k[i] + (lw * 0.5f > 58.0f ? lw * 0.5f - 58.0f : 0.0f);
             uint32_t bc = i == sel ? RGBA(230, 77, 81, 255) : RGBA(101, 61, 72, 255);   /* pause menu colours */
             gfx_sprite(SPR_button_small, 240 - off, y + 1, 1.0f, 1.0f, bc);
             gfx_sprite(SPR_button_small, 240 + off, y + 1, -1.0f, 1.0f, bc);
@@ -157,79 +162,60 @@ void lang_choose(void)
     save_write();
 }
 
+/* anti-mash: a button's press only counts if 30 ms have passed since its last accepted press (also swallows
+ * contact bounce); holding never repeats - every action needs a new press */
 static void read_input(void)
 {
-    static unsigned prev;
-    unsigned held = 0;
-    if (vcpe_autotest) {
-        vcpe_test_step(&held);
-    } else {
-        SceCtrlData pad;
-        sceCtrlPeekBufferPositive(&pad, 1);
-        unsigned b = pad.Buttons;
-        if (b & PSP_CTRL_UP) held |= BTN_UP;
-        if (b & PSP_CTRL_DOWN) held |= BTN_DOWN;
-        if (b & PSP_CTRL_LEFT) held |= BTN_LEFT;
-        if (b & PSP_CTRL_RIGHT) held |= BTN_RIGHT;
-        if (pad.Lx < 50) held |= BTN_LEFT;
-        if (pad.Lx > 205) held |= BTN_RIGHT;
-        if (pad.Ly < 50) held |= BTN_UP;
-        if (pad.Ly > 205) held |= BTN_DOWN;
-        if (b & PSP_CTRL_CROSS) held |= BTN_OK;
-        if (b & PSP_CTRL_CIRCLE) held |= BTN_BACK;
-        if (b & PSP_CTRL_START) held |= BTN_START;
-        if (b & (PSP_CTRL_RTRIGGER | PSP_CTRL_SQUARE)) held |= BTN_RESTART;
-        if (b & (PSP_CTRL_LTRIGGER | PSP_CTRL_TRIANGLE)) held |= BTN_ADVICE;
-    }
-    /* anti-mash: a button's press only counts if 30 ms have passed since its last accepted press
-     * (also swallows contact bounce); holding never repeats - every action needs a new press */
-    static SceInt64 last_press[16];
-    SceInt64 now = sceKernelGetSystemTimeWide();
-    unsigned edges = held & ~prev;
-    in_pressed = 0;
-    for (int i = 0; i < 16; i++) {
-        unsigned bit = 1u << i;
-        if ((edges & bit) && now - last_press[i] >= 30000) {
-            in_pressed |= bit;
-            last_press[i] = now;
-        }
-    }
-    in_held = held;
-    prev = held;
+    in_held = vcpe_pad_update();
+    in_pressed = vcpe_pad_pressed();
 }
 
 int main(int argc, char *argv[])
 {
     vcpe_sys_init(argc, argv);
+    int small = vcpe_mem_32mb();   /* measure the heap before anything is allocated */
+    if (vcpe_autotest)
+        vcpe_seed(1);   /* repeatable test runs */
     save_read();
     gfx_init();
+    vcpe_gfx_pipeline(1);
+    vcpe_gfx_batch(1);
+    /* boot behind the VCPE loading screen: fonts, sound effects (the scene's pages load in game_start) */
+    vcpe_loading_begin(g_ttf_size[0] + g_ttf_size[1] + g_ttf_size[2] + g_sfx_size);
+    gfx_pak_open();
+    vcpe_require_file("MUSIC.PAK", "Helltaker", "Copy MUSIC.PAK next to EBOOT.PBP (all files of the same build).");
     char p[300];
-    vcpe_path(p, sizeof p, "HT.PAK");
-    if (gfx_pak_open(p) < 0) {
-        /* nothing we can draw without the pak: show a red screen */
-        while (vcpe_running) {
-            gfx_begin(RGBA(120, 0, 0, 255));
-            gfx_end();
-        }
-        return 0;
-    }
+    vcpe_path(p, sizeof p, "MUSIC.PAK");
+    SceIoStat st;
+    if (sceIoGetstat(p, &st) < 0 || st.st_size != MUSIC_PAK_SIZE)
+        vcpe_fatal("Helltaker", "MUSIC.PAK does not match this EBOOT.PBP (an incomplete copy, or a file from another "
+                                "version).\n\nCopy EBOOT.PBP and all the PAK files again, all from the same build.");
     vcpe_path(p, sizeof p, "LANG.PAK");
     if (gfx_lang_load(p) == 0)
         gfx_lang_set(!g_save.lang_off);
     vcpe_path(p, sizeof p, "MUSIC.PAK");
     audio_init(p);
+    vcpe_loading_end();
     music_set_volume(g_save.music_vol);
     sfx_set_volume(g_save.sfx_vol);
-    sceCtrlSetSamplingCycle(0);
-    sceCtrlSetSamplingMode(PSP_CTRL_MODE_ANALOG);
+    vcpe_pad_init(binds, sizeof binds / sizeof binds[0], VCPE_STICK_DPAD);
+    vcpe_pad_debounce(30);
     script_load();
+    if (vcpe_autotest)
+        printf("[ht] memory %s, heap free %d KB\n", small ? "32 MB (PSP-1000)" : "64 MB", vcpe_heap_kb());
     if (gfx_lang_name())
         lang_choose();
 
     game_start(0);
     while (vcpe_running) {
         read_input();
+        /* hold SELECT: FPS, update and draw times (the numbers to report from real hardware) */
+        g_perf = (vcpe_pad_psp() & PSP_CTRL_SELECT) != 0;
+        if (g_perf)
+            vcpe_perf_update_begin();
         game_frame();
+        if (g_perf)
+            vcpe_perf_update_end();
         game_draw();
         vcpe_test_frame_end();
     }

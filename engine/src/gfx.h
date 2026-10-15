@@ -17,7 +17,8 @@ void gfx_shutdown(void);
 void gfx_begin(uint32_t clear);
 void gfx_end(void);
 
-int gfx_pak_open(const char *path);
+void gfx_pak_open(void);   /* HT.PAK; error screen when it is missing or from another build */
+extern int g_perf;         /* gfx_end draws the perf overlay (SELECT held) */
 /* translations: LANG.PAK next to the EBOOT (tools/mklang.py) */
 int gfx_lang_load(const char *path);
 const char *gfx_lang_name(void);   /* 0 without a usable LANG.PAK */

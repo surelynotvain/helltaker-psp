@@ -40,6 +40,8 @@ void vcpe_test_step(unsigned *held)
     *held = 0;
     if (!script)
         return;
+    if (vcpe_present_hook)
+        vcpe_present_hook();   /* pipeline: the screen shows the last frame, as without it (snapshots, recordings) */
     if (hk.pre)
         hk.pre();
     if (script_hold_frames > 0) {
@@ -54,13 +56,23 @@ void vcpe_test_step(unsigned *held)
         return;
     }
     while (*script_pos) {
-        char line[64];
+        /* Engine-specific assertions/scripts can exceed the original 63 bytes.
+         * Consume the whole line even when oversized: never execute fragments. */
+        char line[2048];
         int n = 0;
-        while (*script_pos && *script_pos != '\n' && n < 63)
-            line[n++] = *script_pos++;
+        int oversized = 0;
+        while (*script_pos && *script_pos != '\n') {
+            if (n < (int)sizeof(line) - 1) line[n++] = *script_pos;
+            else oversized = 1;
+            script_pos++;
+        }
         line[n] = 0;
         if (*script_pos == '\n')
             script_pos++;
+        if (oversized) {
+            fprintf(stderr, "VCPE autotest line exceeds %zu bytes\n", sizeof(line) - 1);
+            continue;
+        }
         char cmd[16] = {0}, arg[16] = {0};
         int num = 0, num2 = 0;
         int k = sscanf(line, "%15s %15s %d %d", cmd, arg, &num, &num2);
@@ -95,14 +107,41 @@ void vcpe_test_step(unsigned *held)
         } else if (hk.command) {
             r = hk.command(cmd, arg, num, num2, line, held);
         }
+        if (r == VCPE_CMD_UNKNOWN && !strcmp(cmd, "snap")) {
+            /* built-in fallback (a game's own "snap" wins): snap NAME -> SNAPNAME.RAW, 480x272 RGBA */
+            vcpe_test_snap(arg);
+            r = VCPE_CMD_NEXT;
+        }
         if (r == VCPE_CMD_FRAME || (r != VCPE_CMD_UNKNOWN && hk.every_command_takes_a_frame))
             return;
     }
 }
 
+void vcpe_test_snap(const char *name)
+{
+    if (vcpe_present_hook)
+        vcpe_present_hook();
+    void *top; int bw, pf;
+    sceDisplayGetFrameBuf(&top, &bw, &pf, PSP_DISPLAY_SETBUF_IMMEDIATE);
+    if (!top || bw <= 0 || pf != PSP_DISPLAY_PIXEL_FORMAT_8888)
+        return;
+    const uint8_t *fb = (const uint8_t *)((uintptr_t)top | 0x40000000);
+    char f[64], p[300];
+    snprintf(f, sizeof f, "SNAP%s.RAW", name);
+    vcpe_path(p, sizeof p, f);
+    int fd = sceIoOpen(p, PSP_O_WRONLY | PSP_O_CREAT | PSP_O_TRUNC, 0777);
+    if (fd < 0)
+        return;
+    for (int y = 0; y < 272; y++)
+        sceIoWrite(fd, fb + y * bw * 4, 480 * 4);
+    sceIoClose(fd);
+}
+
 void vcpe_test_frame_end(void)
 {
     if (rec_fd >= 0 && ++rec_n % rec_every == 0) {
+        if (vcpe_present_hook)
+            vcpe_present_hook();   /* pipeline: show the frame just built before reading the screen */
         void *top; int bw, pf;
         sceDisplayGetFrameBuf(&top, &bw, &pf, PSP_DISPLAY_SETBUF_IMMEDIATE);
         const uint8_t *fb = (const uint8_t *)((uintptr_t)top | 0x40000000);

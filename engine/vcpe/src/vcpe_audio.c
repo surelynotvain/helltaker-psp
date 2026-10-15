@@ -5,6 +5,7 @@
 #include <pspaudio.h>
 #include <pspiofilemgr.h>
 #include <string.h>
+#include <math.h>
 #include <stdio.h>
 #include <malloc.h>
 #include "vcpe_sys.h"
@@ -58,14 +59,18 @@ typedef struct {
     volatile int paused;
     int gain;            /* 0..256 */
     uint16_t gen;
+    uint32_t started;    /* start order, for vcpe_sfx_play stealing */
 } Voice;
 
 static uint8_t *sfx_mem;
 static const VcpeSound *sfx_tab, *music_tab;
 static int nsfx, nvoices;
 static Voice voices[VCPE_MAX_VOICES];
+static uint32_t start_count;
 static volatile int sfx_vol = 256, mus_vol = 256, mus_paused = 0;
 static volatile int mus_num = 1, mus_den = 1;
+static volatile int lp_k = 32768;   /* music low-pass: one pole (6 dB/octave), coefficient x 32768 (32768: off) */
+static int lp_l[2], lp_r[2];
 static volatile uint32_t mixed_ms;
 
 static int sfx_sample(Voice *v, uint32_t i)
@@ -98,8 +103,27 @@ int vcpe_voice_start(int vi, int id, float pitch, int loop)
     v->cur = sfx_sample(v, 0);
     v->next = v->samples > 1 ? sfx_sample(v, 1) : 0;
     v->gen++;
+    v->started = ++start_count;
     v->active = 1;
     return (v->gen << 8) | vi;
+}
+
+int vcpe_sfx_play(int id, float pitch, int gain256, int first, int last)
+{
+    if (first < 0) first = 0;
+    if (last >= nvoices) last = nvoices - 1;
+    int best = -1;
+    for (int vi = first; vi <= last; vi++) {
+        if (!voices[vi].active) { best = vi; break; }
+        if (best < 0 || voices[vi].started < voices[best].started)
+            best = vi;
+    }
+    if (best < 0)
+        return -1;
+    int h = vcpe_voice_start(best, id, pitch, 0);
+    if (h >= 0)
+        voices[best].gain = gain256;
+    return h;
 }
 
 void vcpe_voice_stop(int vi) { if (vi >= 0 && vi < nvoices) { voices[vi].active = 0; voices[vi].loop = 0; } }
@@ -256,6 +280,13 @@ void vcpe_music_stop_now(void)
 void vcpe_sfx_gain(int gain256) { sfx_vol = gain256; }
 void vcpe_music_gain(int gain256) { mus_vol = gain256; }
 void vcpe_music_scale(int num, int den) { mus_den = den > 0 ? den : 1; mus_num = num; }
+void vcpe_music_lowpass(float hz)
+{
+    if (hz <= 0 || hz >= 20000) { lp_k = 32768; return; }
+    float a = 1.0f - expf(-6.2831853f * hz / 44100.0f);
+    int k = (int)(a * 32767);
+    lp_k = k < 1 ? 1 : k;
+}
 void vcpe_music_pause(int on) { mus_paused = on; }
 uint32_t vcpe_audio_ms(void) { return mixed_ms; }
 
@@ -267,6 +298,39 @@ static inline short clip16(int s)
 {
     return s > 32767 ? 32767 : (s < -32768 ? -32768 : s);
 }
+
+/* one voice over the whole block into the accumulator (same arithmetic as sample by sample, far fewer checks) */
+static void mix_voice(Voice *v, int *acc, int n)
+{
+    int cur = v->cur, next = v->next, gain = v->gain;
+    uint32_t frac = v->frac, step = v->step, pos = v->pos, samples = v->samples;
+    for (int i = 0; i < n; i++) {
+        acc[i] += ((cur + (((next - cur) * (int)(frac >> 4)) >> 12)) * gain) >> 8;
+        frac += step;
+        while (frac >= 65536) {
+            frac -= 65536;
+            pos++;
+            cur = next;
+            if (pos + 1 < samples)
+                next = sfx_sample(v, pos + 1);
+            else if (pos >= samples) {
+                if (v->loop) {
+                    pos = 0;
+                    cur = sfx_sample(v, 0);
+                    next = sfx_sample(v, 1);
+                    continue;
+                }
+                v->active = 0;
+                v->cur = cur; v->next = next; v->frac = frac; v->pos = pos;
+                return;
+            } else
+                next = 0;
+        }
+    }
+    v->cur = cur; v->next = next; v->frac = frac; v->pos = pos;
+}
+
+static int mix_acc[OUT_FRAMES];
 
 static int mix_thread(SceSize args, void *argp)
 {
@@ -287,38 +351,23 @@ static int mix_thread(SceSize args, void *argp)
         int mg = (((mus_vol * fade) >> 8) * mus_num) / mus_den;
         int sg = sfx_vol;
         mixed_ms += (OUT_FRAMES * 1000) / 44100;
+        memset(mix_acc, 0, sizeof mix_acc);
+        for (int vi = 0; vi < nvoices; vi++) {
+            Voice *v = &voices[vi];
+            if (v->active && !v->paused)
+                mix_voice(v, mix_acc, OUT_FRAMES);
+        }
         for (int i = 0; i < OUT_FRAMES; i++) {
             int l, r;
             music_frame(&l, &r);
+            if (lp_k < 32768) {
+                int k = lp_k;
+                lp_l[0] += ((l - lp_l[0]) * k) >> 15; l = lp_l[0];
+                lp_r[0] += ((r - lp_r[0]) * k) >> 15; r = lp_r[0];
+            }
             l = (l * mg) >> 8;
             r = (r * mg) >> 8;
-            int s = 0;
-            for (int vi = 0; vi < nvoices; vi++) {
-                Voice *v = &voices[vi];
-                if (!v->active || v->paused)
-                    continue;
-                s += ((v->cur + (((v->next - v->cur) * (int)(v->frac >> 4)) >> 12)) * v->gain) >> 8;
-                v->frac += v->step;
-                while (v->frac >= 65536) {
-                    v->frac -= 65536;
-                    v->pos++;
-                    v->cur = v->next;
-                    if (v->pos + 1 < v->samples)
-                        v->next = sfx_sample(v, v->pos + 1);
-                    else if (v->pos >= v->samples) {
-                        if (v->loop) {
-                            v->pos = 0;
-                            v->cur = sfx_sample(v, 0);
-                            v->next = sfx_sample(v, 1);
-                            continue;
-                        }
-                        v->active = 0;
-                        break;
-                    } else
-                        v->next = 0;
-                }
-            }
-            s = (s * sg) >> 8;
+            int s = (mix_acc[i] * sg) >> 8;
             out[i * 2] = clip16(l + s);
             out[i * 2 + 1] = clip16(r + s);
         }
@@ -334,10 +383,17 @@ int vcpe_audio_init(const char *music_pak, int voices_n, uint32_t sfx_off, uint3
     sfx_tab = sfx;
     nsfx = sfx_n;
     music_tab = music;
+    int st = vcpe_step_begin("Loading sound effects: %d, %u KB", sfx_n, (unsigned)(sfx_size / 1024));
     sfx_mem = vcpe_pak_read_alloc(sfx_off, sfx_size);
+    vcpe_step_end(st, sfx_mem != 0);
     snprintf(mus_path, sizeof mus_path, "%s", music_pak);
+    const char *mname = strrchr(music_pak, '/');
+    st = vcpe_step_begin("Opening music %s", mname ? mname + 1 : music_pak);
     mus_fd = sceIoOpen(music_pak, PSP_O_RDONLY, 0);
+    vcpe_step_end(st, mus_fd >= 0);
+    st = vcpe_step_begin("Starting audio output (%d voices)", nvoices);
     audio_ch = sceAudioChReserve(PSP_AUDIO_NEXT_CHANNEL, OUT_FRAMES, PSP_AUDIO_FORMAT_STEREO);
+    vcpe_step_end(st, audio_ch >= 0);
     if (audio_ch < 0)
         return audio_ch;
     running = 1;

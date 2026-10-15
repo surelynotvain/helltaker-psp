@@ -427,8 +427,8 @@ int boss_giga_offset(int g, float *dx, float *dy)
     *dx = giga[g].x - B->giga[g].x;
     *dy = giga[g].y - B->giga[g].y;
     if (giga[g].shake > 0) {
-        *dx += ((rand() % 200) / 100.0f - 1.0f) * giga[g].shake;
-        *dy += ((rand() % 200) / 100.0f - 1.0f) * giga[g].shake;
+        *dx += (vcpe_frand() * 2.0f - 1.0f) * giga[g].shake;
+        *dy += (vcpe_frand() * 2.0f - 1.0f) * giga[g].shake;
     }
     return giga[g].shown ? 1 : -1;
 }
