@@ -5,9 +5,12 @@
 
 ![Main menu](screenshots/main_menu.png)
 
-**Helltaker PSP** is a complete fan-made port (demake) of **Helltaker** and its free **Examtaker** bonus chapter for the Sony PlayStation Portable, by SurelyNotVain. It is PSP homebrew with its own engine written in C, packaged as a standard unsigned application for **ARK-4** and **ARK-5**, and fully playtested on a real PSP-3004.
+**Helltaker PSP** is a complete fan-made port (demake) of **Helltaker** and its free **Examtaker** bonus chapter for the Sony PlayStation Portable, by SurelyNotVain. It is PSP homebrew with its own engine written in C, packaged as a standard unsigned application for **ARK-4** and **ARK-5**.
 
 The whole game is playable: all chapters, the Judgement boss fight, the epilogue and both endings, plus the free **Examtaker** bonus chapter with its lab floors and the final boss.
+
+> [!NOTE]
+> **Version 2.1 is my last update to Helltaker PSP.** The port is complete. From now on I will only release fixes for game-breaking bugs (crashes, a level that can't be finished, lost saves). Please report those through GitHub Issues. Translations are still welcome and will be added with credit.
 
 ![Helltaker PSP in the XMB of a real PSP-3004](screenshots/real_psp_3004.jpg)
 
@@ -15,6 +18,33 @@ The whole game is playable: all chapters, the Judgement boss fight, the epilogue
 
 > [!IMPORTANT]
 > This is an unofficial fan project. It is not affiliated with or endorsed by vanripper, Sony, the ARK developers, or the original Helltaker team.
+
+## What's new in 2.1
+
+### Fixes
+
+- **Chapters V and VI can be finished again after the secret inscription.** Reading the inscription now leads straight into the demon's dialogue, as in the original. Before, the box was left in front of the demon and the level got stuck.
+- **Lucifer's CEO entrance** now has her two skeleton guards, who step in on either side of her, timed to the original sound. She no longer fades in from transparent.
+- **Examtaker's Loremaster** scene now shows Lucy the maid next to her.
+- **Pause menu selection:** the selected row is now the wider one, with its brackets moving outward as in the original. Before, it was the other way round. The same fix applies to the language picker.
+
+### Text
+
+- **Text is now drawn by the PSP itself** from the game's fonts, instead of from pictures prepared on a PC. The letters are evenly spaced (no more "absolut e" or "You' ve"), with proper kerning, in English and in translations.
+- `HT.PAK` is about 2 MB smaller (the text pictures are gone).
+- Language packs are much smaller: the Polish pack went from 2.7 MB to 50 KB. Old language packs still work.
+
+### Engine
+
+The game now runs on **Vain's C Portable Engine 3.4**:
+
+- **Loading screen.** Starting the game and changing levels now show a loading screen with a progress bar when the memory stick is slow, instead of a frozen picture.
+- **Smoother frames.** The CPU prepares the next frame while the PSP's graphics chip draws the current one, and sprites are sent to the graphics chip in batches.
+- **Safer saves.** Progress is written to `SETTINGS.BIN` with a backup copy (`SETTINGS.BIN.BAK`) and a checksum, so a save interrupted by a dead battery can't wipe your progress. Saves from 2.0 are carried over automatically.
+- **Clear error screens.** A missing, incomplete or mismatched `HT.PAK` or `MUSIC.PAK` now shows a message that says what to copy, instead of a blank screen.
+- **Performance overlay.** Hold SELECT to see the frame rate, update and draw times, and free memory.
+- **PSP-1000 detection** and memory checks for the 32 MB model.
+- The same controls as before: the same buttons, the same analog stick behaviour and the same anti-mash delay.
 
 ## What's included
 
@@ -43,13 +73,15 @@ The whole game is playable: all chapters, the Judgement boss fight, the epilogue
 
 ### Port features
 
-- Built on **Vain's C Portable Engine**, the PSP engine shared with the Awaria PSP port
+- Built on **Vain's C Portable Engine** (VCPE), the PSP engine shared with the Awaria PSP port
 - Native 480x272 presentation using the PSP's hardware renderer (GU)
+- Text rendered on the PSP from the game's own fonts
 - Language packs (`LANG.PAK`): play in English or in an installed translation, switchable at any time
-- Original animations, dialogue portraits, fonts, music and sound effects
+- Original animations, dialogue portraits, music and sound effects
 - Streamed music
+- Loading screen with a progress bar
 - Animated XMB icon (a chapter I speedrun) and XMB background music
-- Progress is saved automatically (reached chapters, ritual pieces and Examtaker floors)
+- Progress is saved automatically (reached chapters, ritual pieces and Examtaker floors), with a backup copy
 - One step per button press, with a short anti-mash delay so held or bounced buttons never take extra steps
 - Works from Memory Stick and from PSP Go internal storage
 
@@ -73,11 +105,11 @@ With a language pack installed:
 - Press START in the main menu to choose the language again.
 - The pause menu has a LANGUAGE row that switches between English and the translation instantly.
 
-Without `LANG.PAK` the game is exactly as before, in English. Only one language pack can be installed at a time.
+Without `LANG.PAK` the game is in English. Only one language pack can be installed at a time.
 
 ### Make your own translation
 
-The [`translation`](translation/) folder has everything needed to build a `LANG.PAK` for any language from the PC game's text files: the `mklang.py` tool (Python 3 with Pillow and numpy) and a step by step guide, [`TRANSLATING.md`](translation/TRANSLATING.md). It contains no game text: it reads the English files from your own Helltaker install (free on Steam), and an existing translation of the PC game can be used as it is. Finished a translation? Share it through GitHub Issues so it can be added to a release, with credit.
+The [`translation`](translation/) folder has everything needed to build a `LANG.PAK` for any language from the PC game's text files: the `mklang.py` tool (Python 3 with Pillow and numpy) and a step by step guide, [`TRANSLATING.md`](translation/TRANSLATING.md). It contains no game text: it reads the English files from your own Helltaker install (free on Steam), and an existing translation of the PC game can be used as it is. Since 2.1 a language pack holds the translated text itself, so it stays small. Finished a translation? Share it through GitHub Issues so it can be added to a release, with credit.
 
 ## Requirements
 
@@ -118,15 +150,15 @@ ef0:/PSP/GAME/HelltakerPSP/
 Then open the Game menu on the PSP and launch **Helltaker PSP**.
 
 > [!WARNING]
-> Do not copy `EBOOT.PBP` on its own. `HT.PAK` holds the graphics and sound effects and `MUSIC.PAK` holds the music. Both must stay in the same folder as the EBOOT.
+> Do not copy `EBOOT.PBP` on its own. `HT.PAK` holds the graphics, fonts and sound effects and `MUSIC.PAK` holds the music. Both must stay in the same folder as the EBOOT, and all files must come from the same release.
 
 ## Updating
 
 1. Exit the game.
 2. Replace `EBOOT.PBP`, `HT.PAK` and `MUSIC.PAK` in `PSP/GAME/HelltakerPSP/` with the files from the new release.
-3. Keep `SETTINGS.BIN` if it is there. It is your save file (progress and settings).
+3. Keep `SETTINGS.BIN` (and `SETTINGS.BIN.BAK`) if they are there. They are your save file (progress and settings).
 
-Version 2.0 changed `HT.PAK`, so from 1.51 or older replace both `EBOOT.PBP` and `HT.PAK` (`MUSIC.PAK` is unchanged since 1.3). Language packs belong to the game version they were released with: when you update the game, also download the language pack again from the same release.
+Version 2.1 changed `EBOOT.PBP` and `HT.PAK` (`MUSIC.PAK` is unchanged since 1.3). Language packs belong to the game version they were released with: when you update the game, also download the language pack again from the same release.
 
 ## Controls
 
@@ -138,6 +170,7 @@ Version 2.0 changed `HT.PAK`, so from 1.51 or older replace both `EBOOT.PBP` and
 | START | Pause menu (in the main menu: choose the language, when a language pack is installed) |
 | R or Square | Restart the level |
 | L or Triangle | Life advice (hint) |
+| SELECT (hold) | Performance overlay |
 | HOME | PSP exit menu |
 
 Movement is turn based. Each press moves one tile, so release the direction before the next step.
@@ -148,12 +181,12 @@ Movement is turn based. Each press moves one tile, so release the direction befo
 |---|---|
 | ARK-4 | Supported |
 | ARK-5 | Supported |
-| PSP-1000 | Supported (standard 24 MB memory layout, no expanded memory needed) |
-| PSP-2000 / 3000 / Street | Supported (fully playtested on a PSP-3004) |
+| PSP-1000 | Supported (standard memory layout, no expanded memory needed) |
+| PSP-2000 / 3000 / Street | Supported (playtested on a PSP-3004) |
 | PSP Go Memory Stick | Supported |
 | PSP Go internal storage | Supported through `ef0:` |
 
-The whole game, including Examtaker, has been fully playtested on a real PSP-3004. Minor bugs found during that playtest are being fixed in ongoing updates. Reports from other models are very welcome, especially from PSP-1000 owners on the Examtaker boss floor, which is the most demanding scene.
+The whole game, including Examtaker, was playtested on a real PSP-3004 up to version 2.0. Version 2.1 was tested in the PPSSPP emulator, including the PSP-1000 memory layout. If something in 2.1 breaks the game on your console, please report it.
 
 ## Troubleshooting
 
@@ -167,13 +200,13 @@ PSP/GAME/HelltakerPSP/EBOOT.PBP
 
 Avoid an extra nested folder such as `PSP/GAME/HelltakerPSP/HelltakerPSP/EBOOT.PBP`.
 
-### Black screen, missing graphics or no sound effects
+### An error screen at start-up
 
-Make sure `HT.PAK` is in the same folder as `EBOOT.PBP` and that it was copied completely (about 28 MB). Recopy it if in doubt.
+The message says which file is missing or doesn't match. Copy `EBOOT.PBP`, `HT.PAK` and `MUSIC.PAK` again, all from the same release. `HT.PAK` is about 26 MB and `MUSIC.PAK` about 71 MB.
 
 ### No music
 
-Make sure `MUSIC.PAK` is in the same folder as `EBOOT.PBP` and that it was copied completely (about 71 MB). Keep the file names in upper case.
+Make sure `MUSIC.PAK` is in the same folder as `EBOOT.PBP` and was copied completely. Keep the file names in upper case.
 
 ### Music stutters
 
@@ -189,7 +222,7 @@ Slow or damaged storage can interrupt streamed audio. Try copying the game again
 
 ## Reporting bugs
 
-Bug reports and hardware reports are welcome through GitHub Issues. Please include:
+From 2.1 on only game-breaking bugs will be fixed. Reports through GitHub Issues should include:
 
 - PSP model
 - ARK version
@@ -199,9 +232,12 @@ Bug reports and hardware reports are welcome through GitHub Issues. Please inclu
 - Steps to reproduce the problem
 - A photo or video if the problem is visual
 
-## Notes
+## Source code
 
-The source code of the PSP engine is available in the [`engine`](engine/) folder, and the translation tools in the [`translation`](translation/) folder. Game assets, converted game data and the data conversion tools are not included.
+- [`engine`](engine/): the source code of the game (`engine/src`) and of Vain's C Portable Engine 3.4 (`engine/vcpe/src`). See [`engine/README.md`](engine/README.md).
+- [`translation`](translation/): the language pack tools.
+
+Game assets, converted game data and the data conversion tools are not included.
 
 Please do not redistribute modified releases under the same name without clearly marking them as unofficial modifications.
 
@@ -212,7 +248,7 @@ Please do not redistribute modified releases under the same name without clearly
 - PSP homebrew development is supported by the PSPSDK and pspdev communities.
 - ARK compatibility is thanks to the ARK community and its contributors.
 - Polish translation: the official translation by vanripper.
-- Translation fonts: Crimson Pro (The Crimson Pro Project Authors), Amiri (Khaled Hosny) and Segment7 (Cedric Knight), all under the SIL Open Font License 1.1 (see `translation/langkit/fonts/OFL.txt`).
+- Fonts: Crimson Pro (The Crimson Pro Project Authors), Amiri (Khaled Hosny) and Segment7 (Cedric Knight), all under the SIL Open Font License 1.1 (see `translation/langkit/fonts/OFL.txt`).
 - PSP port by SurelyNotVain and Taliayaya.
 
 All original Helltaker names, characters, artwork, music and related assets belong to their respective creators and rights holders. Helltaker is free on Steam; please support the original creator.
